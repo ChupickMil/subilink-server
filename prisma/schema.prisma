@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolesInChat {
+  creator
+  admin
+  user
+}
+
+enum Themes {
+  system
+  light
+  dark
+}
+
+enum Fonts {
+  roboto
+}
+
+enum FriendStatuses {
+  pending
+  confirmed
+  blocked
+}
+
+model User {
+  id       Int      @id @unique @default(autoincrement())
+  phone    String   @unique
+  name     String
+  email    String?  @unique
+  password String?
+  createAt DateTime @default(now()) @map("created_at")
+  updateAt DateTime @updatedAt @map("update_at")
+
+  twofa            TwoFA?
+  settings         Setting?
+  chat             Chat?
+  Message          Message?
+  chat_participant Chat_participant?
+  followedFriends  Friend[]          @relation("FollowedRelation")
+  followerFriends  Friend[]          @relation("FollowerRelation")
+
+  @@map("user")
+}
+
+model TwoFA {
+  id                  Int     @id @unique @default(autoincrement())
+  user_id             Int     @unique
+  email               String? @unique
+  oauth               String? @unique
+  autentificator_code String?
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("twofa")
+}
+
+model Setting {
+  id        Int    @id @unique @default(autoincrement())
+  user_id   Int    @unique
+  theme     Themes
+  font      Fonts
+  font_size Int
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("setting")
+}
+
+model Chat {
+  id         Int      @id @unique @default(autoincrement())
+  name       String
+  creator_id Int      @unique
+  is_group   Boolean
+  created_at DateTime @default(now()) @map("created_at")
+
+  user             User              @relation(fields: [creator_id], references: [id])
+  Message          Message?
+  Chat_participant Chat_participant?
+
+  @@map("chat")
+}
+
+model Message {
+  id         Int       @id @unique @default(autoincrement())
+  sender_id  Int       @unique
+  chat_id    Int       @unique
+  read_at    DateTime?
+  content    String?
+  img_url    String?
+  video_url  String?
+  deleted_at DateTime
+  send_at    DateTime
+
+  user User @relation(fields: [sender_id], references: [id])
+  chat Chat @relation(fields: [chat_id], references: [id])
+
+  @@map("message")
+}
+
+model Chat_participant {
+  id        Int         @id @unique @default(autoincrement())
+  chat_id   Int         @unique
+  user_id   Int         @unique
+  joined_at DateTime
+  role      RolesInChat
+
+  user User @relation(fields: [user_id], references: [id])
+  chat Chat @relation(fields: [chat_id], references: [id])
+
+  @@map("chat_participant")
+}
+
+model Friend {
+  id          Int            @id @unique @default(autoincrement())
+  follower_id Int
+  followed_id Int
+  created_at  DateTime
+  status      FriendStatuses
+
+  followed User @relation(fields: [followed_id], references: [id], name: "FollowedRelation")
+  follower User @relation(fields: [follower_id], references: [id], name: "FollowerRelation")
+
+  @@map("friend")
+}
