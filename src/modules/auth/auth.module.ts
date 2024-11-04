@@ -4,6 +4,7 @@ import {
     AuthenticatedGuard,
     LocalAuthGuard,
 } from 'src/common/guards/LocalAuthGuard';
+import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
 import { LocalStrategy } from 'src/common/strategies/local.strategy';
 import { SessionSerializer } from 'src/common/utils/SessionSerializer';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -23,6 +24,7 @@ import { AuthService } from './auth.service';
         LocalStrategy,
         LocalAuthGuard,
         AuthenticatedGuard,
+        TwoFAGuard,
     ],
     controllers: [AuthController],
     exports: [AuthService],

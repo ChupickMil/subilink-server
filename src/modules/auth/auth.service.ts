@@ -95,13 +95,47 @@ export class AuthService {
             return null;
         }
 
-        const user = this.prisma.user.findFirst({
+        const user = await this.prisma.user.findFirst({
             where: {
                 phone,
             },
         });
 
+        if (!user) {
+            const user = await this.userService.createUser({ phone });
+            return user;
+        }
+
         return user;
+    }
+
+    async isTwoFAEnabled(
+        value: number | string,
+        type: 'id' | 'phone',
+    ): Promise<boolean> {
+        let user_id: number;
+
+        if (type === 'phone') {
+            const user = await this.prisma.user.findUnique({
+                where: { phone: value.toString() },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return false;
+            }
+
+            user_id = user.id;
+        } else {
+            user_id = Number(value);
+        }
+
+        const twoFa = await this.prisma.twoFA.findFirst({
+            where: { user_id },
+            select: { autentificator_code: true, oauth: true },
+        });
+
+        return Boolean(twoFa?.autentificator_code || twoFa?.oauth);
     }
 
     async isRateLimited(phone: string) {
@@ -196,7 +230,7 @@ export class AuthService {
         phone: string,
         code: number,
     ): Promise<void> {
-        const timer = 1000 * 60 * 5; // 5 минут
+        const timer = 1000 * 60 * 2; // 5 минут
         await this.redis.set(phone, code, timer);
     }
 

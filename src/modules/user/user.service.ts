@@ -14,6 +14,7 @@ export class UserService {
                     name: user.name,
                 },
             });
+
             return newUser;
         } catch (err) {
             throw new Error(err);

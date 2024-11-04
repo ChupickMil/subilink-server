@@ -19,7 +19,7 @@ export class RateLimitGuard implements CanActivate {
 
         if (isRateLimited) {
             throw new HttpException(
-                'Too many requests. Wait 5 minutes',
+                'Too many requests. Wait 2 minutes',
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
