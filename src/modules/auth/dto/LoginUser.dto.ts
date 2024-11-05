@@ -1,15 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsPhoneNumber, IsString, Length } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsPhoneNumber, IsString, Length } from 'class-validator';
 
 export class LoginUser {
     @ApiProperty()
-    @IsPhoneNumber('RU', {
-        message: 'Phone number is invalid',
-    })
+    @IsNotEmpty()
+    @Transform(({ value }) => value.trim())
+    @IsPhoneNumber(undefined, { message: 'phone is invalid' })
     phone: string;
 
     @ApiProperty()
     @IsString()
+    @IsNotEmpty()
     @Length(6, 6, {
         message: 'Code must be 6 length',
     })

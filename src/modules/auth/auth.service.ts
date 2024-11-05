@@ -230,7 +230,7 @@ export class AuthService {
         phone: string,
         code: number,
     ): Promise<void> {
-        const timer = 1000 * 60 * 2; // 5 минут
+        const timer = 1000 * 60 * 2; // 2 минуты
         await this.redis.set(phone, code, timer);
     }
 

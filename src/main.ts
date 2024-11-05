@@ -46,7 +46,7 @@ async function bootstrap() {
     app.use(passport.session());
 
     app.enableCors({
-        origin: 'http://localhost:8080', // точный домен
+        origin: 'http://localhost:3000', // точный домен
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE, OPTIONS',
         credentials: true, // поддержка cookies
         exposedHeaders: ['Content-Disposition'],

@@ -1,14 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsPhoneNumber, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsPhoneNumber, IsString } from 'class-validator';
 
 export class ValidateTwoFA {
     @ApiProperty()
-    @IsPhoneNumber('RU', {
-        message: 'Phone number is invalid',
-    })
+    @IsNotEmpty()
+    @Transform(({ value }) => value.trim())
+    @IsPhoneNumber(undefined, { message: 'phone is invalid' })
     phone: string;
 
     @ApiProperty()
+    @IsNotEmpty()
     @IsString()
     token: string;
 }

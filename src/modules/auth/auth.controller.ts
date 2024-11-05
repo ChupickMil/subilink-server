@@ -6,6 +6,7 @@ import {
     HttpStatus,
     Post,
     Req,
+    Res,
     UseGuards,
 } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
@@ -53,6 +54,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('send-code-phone')
     async sendCode(
+        @Res() res,
         @Body() { phone }: VerificationPhone,
     ): Promise<{ message: string }> {
         const isUserExists = await this.authService.isUserExist(phone);
@@ -60,13 +62,13 @@ export class AuthController {
         await this.authService.sendVerificationCode(phone);
 
         if (isUserExists) {
-            return {
-                message: AUTH.SUCCESS.PHONE_CODE_LOGIN,
-            };
-        } else {
-            return {
+            return res.status(201).json({
                 message: AUTH.SUCCESS.PHONE_CODE_REGISTRATION,
-            };
+            });
+        } else {
+            return res.status(201).json({
+                message: AUTH.SUCCESS.PHONE_CODE_REGISTRATION,
+            });
         }
     }
 
