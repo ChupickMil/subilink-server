@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsPhoneNumber } from 'class-validator';
 
-export class GenerateTwoFA {
+export class GenerateTwoFADto {
     @ApiProperty()
     @IsNotEmpty()
     @Transform(({ value }) => value.trim())

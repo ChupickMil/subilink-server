@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsPhoneNumber, IsString, Length } from 'class-validator';
 
-export class LoginUser {
+export class LoginUserDto {
     @ApiProperty()
     @IsNotEmpty()
     @Transform(({ value }) => value.trim())

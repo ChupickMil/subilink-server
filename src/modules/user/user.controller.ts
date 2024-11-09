@@ -1,4 +1,33 @@
-import { Controller } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Post,
+    Res,
+    Session,
+    UseGuards,
+} from '@nestjs/common';
+import { ApiResponse } from '@nestjs/swagger';
+import { AuthenticatedGuard } from 'src/common/guards/LocalAuthGuard';
+import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
+import { UpdateUserDto } from './dto';
+import { UserService } from './user.service';
 
 @Controller('user')
-export class UserController {}
+export class UserController {
+    constructor(private readonly userService: UserService) {}
+
+    @ApiResponse({ status: 200, type: UpdateUserDto })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @Post('update-name')
+    async updateName(
+        @Session() session,
+        @Body() user: UpdateUserDto,
+        @Res() res,
+    ) {
+        console.log(await this.userService.updateUser(user));
+        console.log(session);
+        return res.status(200).json({
+            success: true,
+        });
+    }
+}

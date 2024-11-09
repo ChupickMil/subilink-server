@@ -6,7 +6,7 @@ import { AUTH } from 'src/common/messages';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { UserService } from '../user/user.service';
-import { LoginUser, RegisterUser } from './dto';
+import { LoginUserDto, RegisterUserDto } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -16,7 +16,7 @@ export class AuthService {
         private readonly prisma: PrismaService,
     ) {}
 
-    async register(user: RegisterUser) {
+    async register(user: RegisterUserDto) {
         try {
             const isHaveUser = await this.userService.findUser(
                 user.phone,
@@ -43,7 +43,7 @@ export class AuthService {
         }
     }
 
-    async login(user: LoginUser) {}
+    async login(user: LoginUserDto) {}
 
     async logout() {}
 
@@ -59,6 +59,10 @@ export class AuthService {
 
     public async isUserExist(phone: string): Promise<boolean> {
         return !!(await this.userService.findUser(phone, 'phone'));
+    }
+
+    public async isUserReg(phone: string): Promise<boolean> {
+        return !!(await this.userService.getName(phone));
     }
 
     async sendVerificationCode(phone: string): Promise<void> {

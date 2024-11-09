@@ -1,6 +1,6 @@
-export { CheckCode } from './CheckCode.dto';
-export { GenerateTwoFA } from './GenerateTwoFA.dto';
-export { LoginUser } from './LoginUser.dto';
-export { RegisterUser } from './RegisterUser.dto';
+export { CheckCodeDto } from './CheckCode.dto';
+export { GenerateTwoFADto } from './GenerateTwoFA.dto';
+export { LoginUserDto } from './LoginUser.dto';
+export { RegisterUserDto } from './RegisterUser.dto';
 export { ValidateTwoFA } from './ValidateTwoFA.dto';
-export { VerificationPhone } from './VerificationPhone.dto';
+export { VerificationPhoneDto } from './VerificationPhone.dto';

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 // import { LocalStrategy } from 'src/common/strategies/local.strategy';
 import {
     AuthenticatedGuard,
@@ -15,7 +15,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 @Module({
-    imports: [UserModule, PrismaModule, RedisModule],
+    imports: [forwardRef(() => UserModule), PrismaModule, RedisModule],
     providers: [
         AuthService,
         { provide: 'AUTH_SERVICE', useClass: AuthService },

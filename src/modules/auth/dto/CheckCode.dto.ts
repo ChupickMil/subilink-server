@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsPhoneNumber, IsString } from 'class-validator';
 
-export class CheckCode {
+export class CheckCodeDto {
     @ApiProperty()
     @IsNotEmpty()
     @Transform(({ value }) => value.trim())
