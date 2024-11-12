@@ -1,9 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 // import { LocalStrategy } from 'src/common/strategies/local.strategy';
-import {
-    AuthenticatedGuard,
-    LocalAuthGuard,
-} from 'src/common/guards/LocalAuthGuard';
+import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard';
+import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard';
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
 import { LocalStrategy } from 'src/common/strategies/local.strategy';
 import { SessionSerializer } from 'src/common/utils/SessionSerializer';

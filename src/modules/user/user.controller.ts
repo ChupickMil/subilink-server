@@ -1,13 +1,16 @@
 import {
     Body,
     Controller,
+    HttpStatus,
     Post,
     Res,
     Session,
     UseGuards,
 } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
-import { AuthenticatedGuard } from 'src/common/guards/LocalAuthGuard';
+
+import { Response } from 'express';
+import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard';
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
 import { UpdateUserDto } from './dto';
 import { UserService } from './user.service';
@@ -22,11 +25,11 @@ export class UserController {
     async updateName(
         @Session() session,
         @Body() user: UpdateUserDto,
-        @Res() res,
+        @Res() res: Response,
     ) {
         console.log(await this.userService.updateUser(user));
         console.log(session);
-        return res.status(200).json({
+        return res.status(HttpStatus.OK).json({
             success: true,
         });
     }

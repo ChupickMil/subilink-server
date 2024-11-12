@@ -25,11 +25,6 @@ export class AuthService {
 
             if (isHaveUser) return { message: 'User already registered' };
 
-            // const userWithHash = {
-            //     ...user,
-            //     password: await this.hashPassword(user.password),
-            // };
-
             const newUser = {
                 phone: user.phone,
                 name: user.name,
@@ -45,7 +40,7 @@ export class AuthService {
 
     async login(user: LoginUserDto) {}
 
-    async logout() {}
+    async logout(sessionId: string) {}
 
     async isValidatedUser(phone: string, password: string) {
         const user = await this.userService.findUser(phone, 'phone');
@@ -188,7 +183,6 @@ export class AuthService {
                         autentificator_code: secret.base32,
                     },
                 });
-                console.log(res);
             }
 
             const qrCodeDataUrl = await qrcode.toDataURL(secret.otpauth_url);

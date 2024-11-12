@@ -10,10 +10,9 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
-import {
-    AuthenticatedGuard,
-    LocalAuthGuard,
-} from 'src/common/guards/LocalAuthGuard';
+import { Request, Response } from 'express';
+import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard';
+import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard';
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
 import { AUTH } from 'src/common/messages';
 import { RateLimitGuard } from './../../common/guards/RateLimitGuard';
@@ -26,46 +25,25 @@ import { VerificationPhoneDto } from './dto/VerificationPhone.dto';
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
-    // @ApiResponse({ status: 200, type: LoginUserDto })
-    // @UseGuards(AuthenticatedGuard)
-    // @HttpCode(HttpStatus.OK)
-    // @Post('login')
-    // async login(
-    //     @Session() session: Record<string, any>,
-    //     @Body() user: LoginUserDto,
-    //     @Req() req,
-    // ) {
-    //     console.log(session);
-    //     return req.user;
-    // }
-
-    // @ApiResponse({ status: 201, type: RegisterUserDto })
-    // @UseGuards(AuthenticatedGuard)
-    // @HttpCode(HttpStatus.CREATED)
-    // @Post('register')
-    // async register(@Body() user: RegisterUserDto) {
-    //     return await this.authService.register(user);
-    // }
-
     @ApiResponse({ status: 201, type: VerificationPhoneDto })
     @UseGuards(RateLimitGuard)
     @HttpCode(HttpStatus.OK)
     @Post('send-code-phone')
     async sendCode(
-        @Res() res,
+        @Res() res: Response,
         @Body() { phone }: VerificationPhoneDto,
-    ): Promise<{ message: string }> {
+    ): Promise<Response> {
         const isUserExists = await this.authService.isUserExist(phone);
-        console.log(isUserExists);
+        console.log('Is user exist in DB: ' + isUserExists);
 
         await this.authService.sendVerificationCode(phone);
 
         if (isUserExists) {
-            return res.status(201).json({
+            return res.status(HttpStatus.CREATED).json({
                 message: AUTH.SUCCESS.PHONE_CODE_LOGIN,
             });
         } else {
-            return res.status(201).json({
+            return res.status(HttpStatus.CREATED).json({
                 message: AUTH.SUCCESS.PHONE_CODE_REGISTRATION,
             });
         }
@@ -76,12 +54,12 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('check-code-phone')
     async checkCode(
-        @Req() req,
-        @Body() { phone, code }: CheckCodeDto,
-    ): Promise<{ message: string; isTwoAuth?: boolean; isReg?: boolean }> {
+        @Res() res: Response,
+        @Body() { phone }: CheckCodeDto,
+    ): Promise<Response> {
         const isUserReg = await this.authService.isUserReg(phone);
 
-        console.log(isUserReg);
+        console.log('Is user reg?: ' + isUserReg);
 
         if (isUserReg) {
             const isTwoFAEnabled = await this.authService.isTwoFAEnabled(
@@ -90,23 +68,23 @@ export class AuthController {
             );
 
             if (isTwoFAEnabled) {
-                return {
+                return res.status(HttpStatus.OK).json({
                     message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                     isTwoAuth: true,
                     isReg: true,
-                };
+                });
             } else {
-                return {
+                return res.status(HttpStatus.OK).json({
                     message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                     isTwoAuth: false,
                     isReg: true,
-                };
+                });
             }
         } else {
-            return {
+            return res.status(HttpStatus.OK).json({
                 message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                 isReg: false,
-            };
+            });
         }
     }
 
@@ -121,38 +99,44 @@ export class AuthController {
     @UseGuards(AuthenticatedGuard)
     @Post('authenticator-check')
     async validate2FA(
-        @Res() res,
-        @Req() req,
+        @Res() res: Response,
+        @Req() req: Request,
         @Body() { phone, code }: CheckCodeDto,
     ) {
         const isValid = await this.authService.validate2FA(phone, code);
         if (isValid) {
             req.session.isTwoFAAuthenticated = true;
-            return res.status(200).json({
+            return res.status(HttpStatus.OK).json({
                 success: true,
             });
         } else {
-            return res.status(401).json({
+            return res.status(HttpStatus.UNAUTHORIZED).json({
                 success: false,
             });
         }
     }
 
-    // @Post('get-session')
-    // @UseGuards(LocalAuthGuard)
-    // getHello(@Session() session: Record<string, any>, @Req() req): string {
-    //     console.log(session);
-    //     console.log(session.id);
-    //     req.session.visited = true;
-    //     session.authenticated = true;
-    //     return '<h1>Hi</h1>';
-    // }
-
     @Get('validate-session')
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    async validateSession(@Res() res, @Req() req) {
-        return res.status(200).json({
-            message: 'Success',
+    async validateSession(@Res() res: Response, @Req() req: Request) {
+        return res.status(HttpStatus.OK).json({
+            success: true,
+        });
+    }
+
+    @Post('logout')
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    async logout(@Res() res: Response, @Req() req: Request) {
+        req.session.destroy((err) => {
+            if (err) {
+                return res
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .json({ success: false });
+            }
+
+            res.clearCookie('SESSION_ID');
+
+            return res.status(HttpStatus.OK).json({ success: true });
         });
     }
 

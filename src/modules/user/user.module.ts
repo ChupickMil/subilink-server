@@ -1,6 +1,6 @@
 import { AuthModule } from '@auth/auth.module';
 import { forwardRef, Module } from '@nestjs/common';
-import { AuthenticatedGuard } from 'src/common/guards/LocalAuthGuard';
+import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard';
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UserController } from './user.controller';
