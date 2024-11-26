@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { UpdateUserDto } from './dto';
-import { CreateUserDto } from './dto/createUser.dto';
+import { Injectable } from '@nestjs/common'
+import { PrismaService } from '../prisma/prisma.service'
+import { UpdateUserDto } from './dto'
+import { CreateUserDto } from './dto/createUser.dto'
 
 @Injectable()
 export class UserService {
@@ -23,6 +23,7 @@ export class UserService {
     }
 
     async findUser(value: number | string, type: 'email' | 'phone' | 'id') {
+        console.log(value)
         return await this.prisma.user.findFirst({
             where: {
                 [type]: value,
@@ -30,11 +31,15 @@ export class UserService {
         });
     }
 
-    async publicUser() {
+    async publicUser(value: number | string, type: 'email' | 'phone' | 'id') {
         return await this.prisma.user.findFirst({
+            where: {
+                [type]: value,
+            },
             select: {
+                id: true,
+                name: true,
                 phone: true,
-                email: true,
             },
         });
     }
@@ -66,5 +71,16 @@ export class UserService {
             },
             data: updatedUser,
         }));
+    }
+
+    async getGlobalUsers() {
+        const users = await this.prisma.user.findMany({
+            select: {
+                id: true,
+                name: true
+            }
+        })
+
+        return users
     }
 }

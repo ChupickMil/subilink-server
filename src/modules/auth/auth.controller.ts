@@ -8,18 +8,18 @@ import {
     Req,
     Res,
     UseGuards,
-} from '@nestjs/common';
-import { ApiResponse } from '@nestjs/swagger';
-import { Request, Response } from 'express';
-import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard';
-import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard';
-import { TwoFAGuard } from 'src/common/guards/TwoFaGuard';
-import { AUTH } from 'src/common/messages';
-import { RateLimitGuard } from './../../common/guards/RateLimitGuard';
-import { AuthService } from './auth.service';
-import { CheckCodeDto } from './dto/CheckCode.dto';
-import { GenerateTwoFADto } from './dto/GenerateTwoFA.dto';
-import { VerificationPhoneDto } from './dto/VerificationPhone.dto';
+} from '@nestjs/common'
+import { ApiResponse } from '@nestjs/swagger'
+import { Request, Response } from 'express'
+import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
+import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard'
+import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { AUTH } from 'src/common/messages'
+import { RateLimitGuard } from './../../common/guards/RateLimitGuard'
+import { AuthService } from './auth.service'
+import { CheckCodeDto } from './dto/CheckCode.dto'
+import { GenerateTwoFADto } from './dto/GenerateTwoFA.dto'
+import { VerificationPhoneDto } from './dto/VerificationPhone.dto'
 
 @Controller('auth')
 export class AuthController {

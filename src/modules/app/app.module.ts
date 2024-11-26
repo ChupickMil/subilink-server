@@ -1,11 +1,13 @@
-import { AuthModule } from '@auth/auth.module';
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PassportModule } from '@nestjs/passport';
-import configurations from '../../configuration';
-import { UserModule } from '../user/user.module';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { AuthModule } from '@auth/auth.module'
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { PassportModule } from '@nestjs/passport'
+import configurations from '../../configuration'
+import { FriendModule } from '../friend/friend.module'
+import { SocketModule } from '../socket/socket.module'
+import { UserModule } from '../user/user.module'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
 
 @Module({
     imports: [
@@ -14,7 +16,9 @@ import { AppService } from './app.service';
             load: [configurations],
         }),
         AuthModule,
+        FriendModule,
         UserModule,
+        SocketModule,
         PassportModule.register({
             session: true,
         }),
