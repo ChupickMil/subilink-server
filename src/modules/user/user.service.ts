@@ -24,6 +24,7 @@ export class UserService {
 
     async findUser(value: number | string, type: 'email' | 'phone' | 'id') {
         console.log(value)
+
         return await this.prisma.user.findFirst({
             where: {
                 [type]: value,
@@ -31,16 +32,18 @@ export class UserService {
         });
     }
 
-    async publicUser(value: number | string, type: 'email' | 'phone' | 'id') {
+    async publicUser(value: number | string, type: 'email' | 'phone' | 'id', isPhone?: boolean) {
+        const selectFields = {
+            id: true,
+            name: true,
+            ...(isPhone ? { phone: true } : {}),
+        };
+    
         return await this.prisma.user.findFirst({
             where: {
                 [type]: value,
             },
-            select: {
-                id: true,
-                name: true,
-                phone: true,
-            },
+            select: selectFields,
         });
     }
 
@@ -73,8 +76,36 @@ export class UserService {
         }));
     }
 
-    async getGlobalUsers() {
+    async getGlobalUsers(userId: string) {
         const users = await this.prisma.user.findMany({
+            where: {
+                AND: [
+                    {
+                        NOT: {
+                            id: Number(userId)
+                        }
+                    },{
+                        OR: [
+                            {
+                                followedFriends: {
+                                    none: {
+                                        followed_id: Number(userId),
+                                        status: 'confirmed'
+                                    }
+                                }
+                            },
+                            {
+                                followerFriends: {
+                                    none: {
+                                        follower_id: Number(userId),
+                                        status: 'confirmed'
+                                    }
+                                }
+                            },
+                        ],
+                    }
+                ]
+            },
             select: {
                 id: true,
                 name: true

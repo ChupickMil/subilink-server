@@ -1,10 +1,12 @@
 import {
-	Controller,
-	Get,
-	HttpCode,
-	HttpStatus,
-	Query,
-	UseGuards,
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Post,
+    Query,
+    UseGuards
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
@@ -29,8 +31,8 @@ export class FriendController {
 	@ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Get('add-friend')
-    async addFriend(@Query() {userId, friendId}: { userId: string, friendId: string }) {
-        return await this.friendService.addFriend(userId, friendId);
+    @Post('add-friend')
+    async addFriend(@Body() body: {userId: string, friendId: string}) {
+        return await this.friendService.addFriend(body.userId, body.friendId);
     }
 }

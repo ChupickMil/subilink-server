@@ -1,12 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import * as qrcode from 'qrcode';
-import * as speakeasy from 'speakeasy';
-import { AUTH } from 'src/common/messages';
-import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
-import { UserService } from '../user/user.service';
-import { LoginUserDto, RegisterUserDto } from './dto';
+import { Injectable } from '@nestjs/common'
+import * as bcrypt from 'bcrypt'
+import * as qrcode from 'qrcode'
+import * as speakeasy from 'speakeasy'
+import { AUTH } from 'src/common/messages'
+import { PrismaService } from '../prisma/prisma.service'
+import { RedisService } from '../redis/redis.service'
+import { UserService } from '../user/user.service'
+import { LoginUserDto, RegisterUserDto } from './dto'
 
 @Injectable()
 export class AuthService {

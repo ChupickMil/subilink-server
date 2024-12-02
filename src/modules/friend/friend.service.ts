@@ -10,7 +10,7 @@ export class FriendService {
     ) {}
 
     async getFriends(id: string) {
-        const friends = await this.prisma.friend.findMany({
+        const friendsFromDb = await this.prisma.friend.findMany({
             where: {
                 status: 'confirmed',
                 OR: [
@@ -23,11 +23,24 @@ export class FriendService {
                 ],
             },
         });
+
+        const friendIds = friendsFromDb.map(friend => {
+            return friend.follower_id === Number(id) ? friend.followed_id : friend.follower_id;
+        });
+
+        console.log(friendIds)
+
+        const friends = await Promise.all(friendIds.map(async (id) => await this.userService.publicUser(id, 'id', false)));
+
 		return friends
     }
 
 	async addFriend(userId: string, friendId: string){
-		console.log(userId)
-		console.log(friendId)
+        await this.prisma.friend.create({
+            data: {
+                follower_id: Number(userId),
+                followed_id: Number(friendId)
+            }
+        })
 	}
 }

@@ -121,8 +121,8 @@ model Friend {
   id          Int            @id @unique @default(autoincrement())
   follower_id Int
   followed_id Int
-  created_at  DateTime
-  status      FriendStatuses
+  created_at  DateTime       @default(now())
+  status      FriendStatuses  @default(pending)
 
   followed User @relation(fields: [followed_id], references: [id], name: "FollowedRelation")
   follower User @relation(fields: [follower_id], references: [id], name: "FollowerRelation")
