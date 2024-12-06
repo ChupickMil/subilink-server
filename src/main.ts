@@ -1,12 +1,12 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import RedisStore from 'connect-redis';
-import * as cookieParser from 'cookie-parser';
-import * as session from 'express-session';
-import * as passport from 'passport';
-import { AppModule } from './modules/app/app.module';
-import { RedisService } from './modules/redis/redis.service';
+import { ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import RedisStore from 'connect-redis'
+import * as cookieParser from 'cookie-parser'
+import * as session from 'express-session'
+import * as passport from 'passport'
+import { AppModule } from './modules/app/app.module'
+import { RedisService } from './modules/redis/redis.service'
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);

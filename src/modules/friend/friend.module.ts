@@ -12,5 +12,6 @@ import { FriendService } from './friend.service'
     imports: [PrismaModule, UserModule, RedisModule],
     providers: [FriendService, AuthService, AuthenticatedGuard, TwoFAGuard],
     controllers: [FriendController],
+    exports: [FriendService]
 })
 export class FriendModule {}

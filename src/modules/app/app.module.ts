@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { PassportModule } from '@nestjs/passport'
 import configurations from '../../configuration'
+import { ChatModule } from '../chat/chat.module'
 import { FriendModule } from '../friend/friend.module'
 import { SocketModule } from '../socket/socket.module'
 import { UserModule } from '../user/user.module'
@@ -18,6 +19,7 @@ import { AppService } from './app.service'
         AuthModule,
         FriendModule,
         UserModule,
+        ChatModule,
         SocketModule,
         PassportModule.register({
             session: true,

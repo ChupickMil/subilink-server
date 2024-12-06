@@ -23,7 +23,7 @@ export class UserService {
     }
 
     async findUser(value: number | string, type: 'email' | 'phone' | 'id') {
-        console.log(value)
+        console.log(value);
 
         return await this.prisma.user.findFirst({
             where: {
@@ -32,13 +32,17 @@ export class UserService {
         });
     }
 
-    async publicUser(value: number | string, type: 'email' | 'phone' | 'id', isPhone?: boolean) {
+    async publicUser(
+        value: number | string,
+        type: 'email' | 'phone' | 'id',
+        isPhone?: boolean,
+    ) {
         const selectFields = {
             id: true,
             name: true,
             ...(isPhone ? { phone: true } : {}),
         };
-    
+
         return await this.prisma.user.findFirst({
             where: {
                 [type]: value,
@@ -82,36 +86,33 @@ export class UserService {
                 AND: [
                     {
                         NOT: {
-                            id: Number(userId)
-                        }
-                    },{
-                        OR: [
-                            {
-                                followedFriends: {
-                                    none: {
-                                        followed_id: Number(userId),
-                                        status: 'confirmed'
-                                    }
-                                }
+                            id: Number(userId),
+                        },
+                    },
+                    {
+                        followedFriends: {
+                            none: {
+                                follower_id: Number(userId),
+                                status: 'confirmed',
                             },
-                            {
-                                followerFriends: {
-                                    none: {
-                                        follower_id: Number(userId),
-                                        status: 'confirmed'
-                                    }
-                                }
+                        },
+                    },
+                    {
+                        followerFriends: {
+                            none: {
+                                followed_id: Number(userId),
+                                status: 'confirmed',
                             },
-                        ],
-                    }
-                ]
+                        },
+                    },
+                ],
             },
             select: {
                 id: true,
-                name: true
-            }
-        })
+                name: true,
+            },
+        });
 
-        return users
+        return users;
     }
 }

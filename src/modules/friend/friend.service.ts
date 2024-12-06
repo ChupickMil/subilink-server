@@ -36,6 +36,15 @@ export class FriendService {
     }
 
 	async addFriend(userId: string, friendId: string){
+        const isExist = await this.prisma.friend.findFirst({
+            where: {
+                follower_id: Number(userId),
+                followed_id: Number(friendId)
+            }
+        })
+
+        if(isExist) return
+
         await this.prisma.friend.create({
             data: {
                 follower_id: Number(userId),
@@ -43,4 +52,12 @@ export class FriendService {
             }
         })
 	}
+
+    async getRequests(userId: string){
+        return await this.prisma.friend.findMany({
+            where: {
+                followed_id: Number(userId)
+            }
+        })
+    }
 }
