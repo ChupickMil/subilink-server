@@ -40,11 +40,13 @@ model User {
 
   twofa            TwoFA?
   settings         Setting?
-  chat             Chat?
-  Message          Message?
+  group            Group?
+  Message          Message[]
   chat_participant Chat_participant?
   followedFriends  Friend[]          @relation("FollowedRelation")
   followerFriends  Friend[]          @relation("FollowerRelation")
+  chatFirstUser    Chat?             @relation("FirstUser")
+  chatSecondUser   Chat?             @relation("SecondUser")
 
   @@map("user")
 }
@@ -74,45 +76,60 @@ model Setting {
 }
 
 model Chat {
-  id         Int      @id @unique @default(autoincrement())
-  name       String
-  creator_id Int      @unique
-  is_group   Boolean
-  created_at DateTime @default(now()) @map("created_at")
+  id          Int      @id @unique @default(autoincrement())
+  first_user  Int      @unique
+  second_user Int      @unique
+  created_at  DateTime @default(now()) @map("created_at")
 
-  user             User              @relation(fields: [creator_id], references: [id])
-  Message          Message?
-  Chat_participant Chat_participant?
+  Message     Message[]
+  user        User     @relation("FirstUser", fields: [first_user], references: [id])
+  user_second User     @relation("SecondUser", fields: [second_user], references: [id])
 
   @@map("chat")
 }
 
+model Group {
+  id         Int    @id @unique @default(autoincrement())
+  name       String
+  creator_id Int    @unique
+
+  Message Message[]
+
+  user             User              @relation(fields: [creator_id], references: [id])
+  Chat_participant Chat_participant?
+
+  @@map("group")
+}
+
 model Message {
-  id         Int       @id @unique @default(autoincrement())
-  sender_id  Int       @unique
-  chat_id    Int       @unique
+  id         Int       @id @default(autoincrement())
+  sender_id  Int       
+  chat_id    Int?     
+  group_id   Int?     
   read_at    DateTime?
   content    String?
   img_url    String?
   video_url  String?
-  deleted_at DateTime
-  send_at    DateTime
+  deleted_at DateTime?
+  send_at    DateTime  @default(now())
+  created_at  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [sender_id], references: [id])
-  chat Chat @relation(fields: [chat_id], references: [id])
+  user  User   @relation(fields: [sender_id], references: [id])
+  chat  Chat?  @relation(fields: [chat_id], references: [id])
+  group Group? @relation(fields: [group_id], references: [id])
 
   @@map("message")
 }
 
 model Chat_participant {
   id        Int         @id @unique @default(autoincrement())
-  chat_id   Int         @unique
+  group_id  Int         @unique
   user_id   Int         @unique
   joined_at DateTime
   role      RolesInChat
 
-  user User @relation(fields: [user_id], references: [id])
-  chat Chat @relation(fields: [chat_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
+  group Group @relation(fields: [group_id], references: [id])
 
   @@map("chat_participant")
 }
@@ -122,7 +139,7 @@ model Friend {
   follower_id Int
   followed_id Int
   created_at  DateTime       @default(now())
-  status      FriendStatuses  @default(pending)
+  status      FriendStatuses @default(pending)
 
   followed User @relation(fields: [followed_id], references: [id], name: "FollowedRelation")
   follower User @relation(fields: [follower_id], references: [id], name: "FollowerRelation")

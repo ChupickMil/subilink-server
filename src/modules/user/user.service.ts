@@ -36,16 +36,18 @@ export class UserService {
         value: number | string,
         type: 'email' | 'phone' | 'id',
         isPhone?: boolean,
+        isLastVisit?: boolean
     ) {
         const selectFields = {
             id: true,
             name: true,
             ...(isPhone ? { phone: true } : {}),
+            ...(isLastVisit ? { lastVisit: true } : {}),
         };
 
         return await this.prisma.user.findFirst({
             where: {
-                [type]: value,
+                [type]: type === 'id' ? Number(value) : value,
             },
             select: selectFields,
         });

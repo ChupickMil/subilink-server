@@ -7,11 +7,13 @@ import {
     SubscribeMessage,
     WebSocketGateway,
 } from '@nestjs/websockets'
+import { ChatService } from '../chat/chat.service'
 import { FriendService } from '../friend/friend.service'
+import { MessageService } from '../message/message.service'
 
 interface IChatMessageDto {
     userId: string;
-    chatId: string;
+    recipientId: string;
     message: string;
     time: string;
 }
@@ -30,13 +32,14 @@ interface IFriendsRequestDto {
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     constructor(
         private readonly friendService: FriendService,
+        private readonly chatService: ChatService,
+        private readonly messageService: MessageService,
     ) {}
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
 
     handleConnection(client: any) {
         // Пример: получаем userId из query параметров соединения
         const userId = client.handshake.query.userId;
-        console.log(client)
         if (userId) {
             this.activeSockets.set(userId, client); // Сохраняем сокет
             console.log(`User connected: ${userId}`);
@@ -55,13 +58,39 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     @SubscribeMessage('message')
-    handleEvent(
+    async handleEvent(
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
         console.log(dto);
         const res = { dto };
         client.emit('message', res.dto);
+
+        const userId = res.dto.userId;
+        const recipientId = res.dto.recipientId;
+        const message = res.dto.message
+        const isHasChat = await this.chatService.getIsHasChat(userId, recipientId);
+
+        if(isHasChat){
+            const chatId = String(await this.chatService.getChatId(userId, recipientId))
+            await this.messageService.sendNewMessageChat(userId, chatId, message)
+        } else {
+            await this.chatService.createChat(userId, recipientId)
+        }
+
+        // Получаем сокет друга
+        const friendSocket = this.activeSockets.get(String(dto.recipientId));
+
+        if (friendSocket) {
+            // Уведомляем друга
+            friendSocket.emit('message-notification', {
+                message: `Новое сообщение ${dto.recipientId}`,
+                requesterId: dto.recipientId,
+            });
+
+        } else {
+            console.log(`Friend ${dto.recipientId} is not connected`);
+        }
     }
 
     @SubscribeMessage('friends-requests')
