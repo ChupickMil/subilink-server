@@ -79,8 +79,8 @@ export class ChatService {
 
         // Возвращаем чат без самого пользователя
         const filteredChats = chats.map((chat) => ({
-            lastMessage: chat.Message[0].content,
-            sender_id: chat.Message[0].sender_id,
+            lastMessage: chat.Message[0]?.content ?? "",
+            sender_id: chat.Message[0]?.sender_id ?? "",
             user:
                 chat.first_user === Number(userId)
                     ? chat.second_user === Number(userId)

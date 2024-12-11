@@ -64,11 +64,14 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     ) {
         console.log(dto);
         const res = { dto };
-        client.emit('message', res.dto);
+        console.log(res)
+
+        client.emit('message', 'Message was sent');
 
         const userId = res.dto.userId;
         const recipientId = res.dto.recipientId;
         const message = res.dto.message
+
         const isHasChat = await this.chatService.getIsHasChat(userId, recipientId);
 
         if(isHasChat){
