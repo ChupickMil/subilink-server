@@ -250,4 +250,15 @@ export class AuthService {
         const isMatch = await bcrypt.compare(password, hash);
         return isMatch;
     }
+
+    public async updateLastVisit(userId: string) {
+        await this.prisma.user.update({
+            where: {
+                id: Number(userId)
+            },
+            data: {
+                last_visit: new Date()
+            }
+        })
+    }
 }

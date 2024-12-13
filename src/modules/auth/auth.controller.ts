@@ -118,7 +118,10 @@ export class AuthController {
 
     @Get('validate-session')
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    async validateSession(@Res() res: Response, @Req() req: Request) {
+    async validateSession(@Res() res: Response, @Req() req) {
+        const userId = req.session.passport.user;
+
+        await this.authService.updateLastVisit(userId)
         return res.status(HttpStatus.OK).json({
             success: true,
         });

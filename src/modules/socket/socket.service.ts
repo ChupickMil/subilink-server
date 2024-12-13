@@ -26,7 +26,7 @@ interface IFriendsRequestDto {
 @Injectable()
 @WebSocketGateway({
     cors: {
-        origin: '*',
+        origin: 'http://localhost:3000', // точный домен
     },
 })
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
@@ -42,6 +42,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const userId = client.handshake.query.userId;
         if (userId) {
             this.activeSockets.set(userId, client); // Сохраняем сокет
+
             console.log(`User connected: ${userId}`);
         }
     }
@@ -64,21 +65,29 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     ) {
         console.log(dto);
         const res = { dto };
-        console.log(res)
-
-        client.emit('message', 'Message was sent');
+        console.log(res);
+        client.emit('message', res);
 
         const userId = res.dto.userId;
         const recipientId = res.dto.recipientId;
-        const message = res.dto.message
+        const message = res.dto.message;
 
-        const isHasChat = await this.chatService.getIsHasChat(userId, recipientId);
+        const isHasChat = await this.chatService.getIsHasChat(
+            userId,
+            recipientId,
+        );
 
-        if(isHasChat){
-            const chatId = String(await this.chatService.getChatId(userId, recipientId))
-            await this.messageService.sendNewMessageChat(userId, chatId, message)
+        if (isHasChat) {
+            const chatId = String(
+                await this.chatService.getChatId(userId, recipientId),
+            );
+            await this.messageService.sendNewMessageChat(
+                userId,
+                chatId,
+                message,
+            );
         } else {
-            await this.chatService.createChat(userId, recipientId)
+            await this.chatService.createChat(userId, recipientId);
         }
 
         // Получаем сокет друга
@@ -86,11 +95,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
         if (friendSocket) {
             // Уведомляем друга
-            friendSocket.emit('message-notification', {
-                message: `Новое сообщение ${dto.recipientId}`,
-                requesterId: dto.recipientId,
-            });
-
+            friendSocket.emit('message-notification', res);
         } else {
             console.log(`Friend ${dto.recipientId} is not connected`);
         }
@@ -112,14 +117,33 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 message: `Новый запрос в друзья от пользователя ${dto.id}`,
                 requesterId: dto.id,
             });
-
         } else {
             console.log(`Friend ${dto.friendId} is not connected`);
         }
-        
-        await this.friendService.addFriend(dto.id, dto.friendId)
+
+        await this.friendService.addFriend(dto.id, dto.friendId);
 
         // Подтверждаем действие инициатору
         client.emit('friends-requests', { success: true });
+    }
+
+    @SubscribeMessage('online-users')
+    async handleOnlineUser(
+        @MessageBody() dto: number[],
+        @ConnectedSocket() client: any,
+    ) {
+        const onlineUser = Array();
+
+        dto.forEach((id) => {
+            const userSocket = this.activeSockets.get(String(id));
+
+            if (userSocket) {
+                onlineUser.push(id);
+            }
+        });
+
+        console.log('Online users: ' + onlineUser);
+
+        client.emit('online-users', onlineUser);
     }
 }

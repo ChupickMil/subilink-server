@@ -59,7 +59,7 @@ export class MessageService {
         return messages
             .map((message) => ({
                 ...message,
-                send_at: message.send_at.toLocaleTimeString(),
+                send_at: message.send_at,
             }))
             .reverse(); 
     }

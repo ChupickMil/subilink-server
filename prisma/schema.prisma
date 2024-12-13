@@ -35,6 +35,7 @@ model User {
   name     String?
   email    String?  @unique
   password String?
+  last_visit DateTime @default(now())
   createAt DateTime @default(now()) @map("created_at")
   updateAt DateTime @updatedAt @map("update_at")
 

@@ -60,6 +60,7 @@ export class ChatService {
                     select: {
                         sender_id: true,
                         content: true,
+                        created_at: true
                     },
                 },
                 user: {
@@ -81,6 +82,7 @@ export class ChatService {
         const filteredChats = chats.map((chat) => ({
             lastMessage: chat.Message[0]?.content ?? "",
             sender_id: chat.Message[0]?.sender_id ?? "",
+            lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
             user:
                 chat.first_user === Number(userId)
                     ? chat.second_user === Number(userId)
@@ -115,7 +117,7 @@ export class ChatService {
 
     public async getChatInfo(chatId: string) {
         // id собеседника
-        const user = await this.userService.publicUser(chatId, 'id');
+        const user = await this.userService.publicUser(chatId, 'id', false, true);
         return user;
     }
 }

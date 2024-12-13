@@ -42,7 +42,7 @@ export class UserService {
             id: true,
             name: true,
             ...(isPhone ? { phone: true } : {}),
-            ...(isLastVisit ? { lastVisit: true } : {}),
+            ...(isLastVisit ? { last_visit: true } : {}),
         };
 
         return await this.prisma.user.findFirst({
