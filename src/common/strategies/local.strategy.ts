@@ -10,7 +10,6 @@ export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
             usernameField: 'phone',
             passwordField: 'code',
         });
-        console.log('local strategy');
     }
 
     async validate(phone: string, code: string): Promise<any> {
@@ -18,8 +17,6 @@ export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
             phone,
             code,
         );
-
-        // console.log(user);
 
         if (!user) {
             throw new BadRequestException();

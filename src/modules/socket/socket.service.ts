@@ -63,9 +63,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
-        console.log(dto);
         const res = { dto };
-        console.log(res);
         client.emit('message', res);
 
         const userId = res.dto.userId;
@@ -106,8 +104,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
     ) {
-        console.log(dto);
-
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 

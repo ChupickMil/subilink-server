@@ -34,7 +34,7 @@ export class AuthController {
         @Body() { phone }: VerificationPhoneDto,
     ): Promise<Response> {
         const isUserExists = await this.authService.isUserExist(phone);
-        console.log('Is user exist in DB: ' + isUserExists);
+        // console.log('Is user exist in DB: ' + isUserExists);
 
         await this.authService.sendVerificationCode(phone);
 
@@ -59,7 +59,7 @@ export class AuthController {
     ): Promise<Response> {
         const isUserReg = await this.authService.isUserReg(phone);
 
-        console.log('Is user reg?: ' + isUserReg);
+        // console.log('Is user reg?: ' + isUserReg);
 
         if (isUserReg) {
             const isTwoFAEnabled = await this.authService.isTwoFAEnabled(

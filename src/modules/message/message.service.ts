@@ -15,7 +15,6 @@ export class MessageService {
                 chat_id: Number(chatId),
             },
         });
-        console.log(lastMessage);
         return lastMessage;
     }
 

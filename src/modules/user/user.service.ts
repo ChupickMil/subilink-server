@@ -23,8 +23,6 @@ export class UserService {
     }
 
     async findUser(value: number | string, type: 'email' | 'phone' | 'id') {
-        console.log(value);
-
         return await this.prisma.user.findFirst({
             where: {
                 [type]: value,

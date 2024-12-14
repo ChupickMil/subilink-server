@@ -39,8 +39,7 @@ export class UserController {
         @Body() user: UpdateUserDto,
         @Res() res: Response,
     ) {
-        console.log(await this.userService.updateUser(user));
-        console.log(session);
+        await this.userService.updateUser(user);
         return res.status(HttpStatus.OK).json({
             success: true,
         });

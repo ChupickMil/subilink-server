@@ -1,7 +1,7 @@
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createClient, RedisClientType } from 'redis';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager'
+import { Inject, Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { createClient, RedisClientType } from 'redis'
 
 @Injectable()
 export class RedisService {
@@ -22,8 +22,6 @@ export class RedisService {
     }
 
     async set(key: string, value: any, ttl: number): Promise<void> {
-        console.log(key);
-        console.log(value);
         try {
             await this.cacheManager.set(key, value, ttl);
         } catch (err) {

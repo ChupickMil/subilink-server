@@ -28,8 +28,6 @@ export class FriendService {
             return friend.follower_id === Number(id) ? friend.followed_id : friend.follower_id;
         });
 
-        console.log(friendIds)
-
         const friends = await Promise.all(friendIds.map(async (id) => await this.userService.publicUser(id, 'id', false)));
 
 		return friends
