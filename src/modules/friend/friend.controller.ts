@@ -5,6 +5,7 @@ import {
     HttpCode,
     HttpStatus,
     Post,
+    Query,
     Req,
     UseGuards
 } from '@nestjs/common'
@@ -22,9 +23,10 @@ export class FriendController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('get-friends')
-    async getFriends(@Req() req) {
+    async getFriends(@Req() req, @Query() query) {
 		const userId = req.session.passport.user;
-        return await this.friendService.getFriends(userId);
+        const search = query.search;
+        return await this.friendService.getFriends(userId, search);
     }
 
 	@ApiResponse({ status: 200 })
@@ -39,9 +41,18 @@ export class FriendController {
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Get('get-requests')
+    @Get('get-friends-requests')
     async getRequests(@Req() req) {
 		const userId = req.session.passport.user;
-        return await this.friendService.getRequests(userId);
+        return await this.friendService.getRequests(userId, 'incoming');
+    }
+
+    @ApiResponse({ status: 200 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('get-outgoing-requests')
+    async getOutgoingRequests(@Req() req) {
+		const userId = req.session.passport.user;
+        return await this.friendService.getRequests(userId, 'outgoing');
     }
 }
