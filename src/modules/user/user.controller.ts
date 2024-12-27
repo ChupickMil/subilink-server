@@ -48,8 +48,9 @@ export class UserController {
     @ApiResponse({ status: 200, type: GlobalUsers })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @Get('get-global-users')
-    async getGlobalUsers(@Req() req, @Query() query: {search: string}) {
-		const userId = req.session.passport.user;
-        return await this.userService.getGlobalUsers(userId)
+    async getGlobalUsers(@Req() req, @Query() query: { search: string }) {
+        const userId = req.session.passport.user;
+        const search = query.search;
+        return await this.userService.getGlobalUsers(userId, search);
     }
 }

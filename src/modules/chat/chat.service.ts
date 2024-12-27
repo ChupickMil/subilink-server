@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UserService } from '../user/user.service'
+import { IFilteredChat } from './dto/filteredChat'
 
 @Injectable()
 export class ChatService {
@@ -39,7 +40,7 @@ export class ChatService {
         });
     }
 
-    public async getChats(userId: string) {
+    public async getChats(userId: string, search?: string) {
         const chats = await this.prisma.chat.findMany({
             where: {
                 OR: [
@@ -60,7 +61,7 @@ export class ChatService {
                     select: {
                         sender_id: true,
                         content: true,
-                        created_at: true
+                        created_at: true,
                     },
                 },
                 user: {
@@ -80,8 +81,8 @@ export class ChatService {
 
         // Возвращаем чат без самого пользователя
         const filteredChats = chats.map((chat) => ({
-            lastMessage: chat.Message[0]?.content ?? "",
-            sender_id: chat.Message[0]?.sender_id ?? "",
+            lastMessage: chat.Message[0]?.content ?? '',
+            sender_id: chat.Message[0]?.sender_id ?? '',
             lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
             user:
                 chat.first_user === Number(userId)
@@ -91,7 +92,25 @@ export class ChatService {
                     : chat.user,
         }));
 
-        return filteredChats
+        if (search) {
+            return await this.getSearchedChats(filteredChats, search);
+        }
+
+        return filteredChats;
+    }
+
+    private async getSearchedChats(filteredChats: IFilteredChat[], search: string) {
+        return await Promise.all(
+            filteredChats.map(async (chat) => {
+                if (
+                    chat.user?.name &&
+                    chat.user.name.toLowerCase().includes(search.toLowerCase())
+                ) {
+                    return chat;
+                }
+                return null;
+            }),
+        ).then((chats) => chats.filter((chat) => chat !== null));
     }
 
     public async getChatId(userId: string, recipientId: string) {
@@ -117,7 +136,12 @@ export class ChatService {
 
     public async getChatInfo(chatId: string) {
         // id собеседника
-        const user = await this.userService.publicUser(chatId, 'id', false, true);
+        const user = await this.userService.publicUser(
+            chatId,
+            'id',
+            false,
+            true,
+        );
         return user;
     }
 }

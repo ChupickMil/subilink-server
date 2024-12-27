@@ -34,7 +34,7 @@ export class UserService {
         value: number | string,
         type: 'email' | 'phone' | 'id',
         isPhone?: boolean,
-        isLastVisit?: boolean
+        isLastVisit?: boolean,
     ) {
         const selectFields = {
             id: true,
@@ -80,7 +80,7 @@ export class UserService {
         }));
     }
 
-    async getGlobalUsers(userId: string) {
+    async getGlobalUsers(userId: string, search: string) {
         const users = await this.prisma.user.findMany({
             where: {
                 AND: [
@@ -109,10 +109,33 @@ export class UserService {
             },
             select: {
                 id: true,
-                name: true,
             },
         });
 
-        return users;
+        return await this.searchUsers(users, search);;
+    }
+
+    private async searchUsers(users: { id: number }[], search: string) {
+        if (!search) {
+            return await Promise.all(
+                users.map(
+                    async (user) => await this.publicUser(user.id, 'id', false),
+                ),
+            );
+        }
+
+        return await Promise.all(
+            users.map(async (user) => {
+                const publicUser = await this.publicUser(user.id, 'id', false);
+                console.log(publicUser)
+                if (
+                    publicUser?.name &&
+                    publicUser.name.toLowerCase().includes(search.toLowerCase())
+                ) {
+                    return publicUser;
+                }
+                return null;
+            }),
+        ).then((users) => users.filter((user) => user !== null));
     }
 }

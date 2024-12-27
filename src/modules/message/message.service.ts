@@ -23,11 +23,20 @@ export class MessageService {
         chatId: string,
         content: string,
     ) {
-        await this.prisma.message.create({
+        return await this.prisma.message.create({
             data: {
                 sender_id: Number(sender_id),
                 chat_id: Number(chatId),
                 content: content,
+            },
+            select: {
+                id: true,
+                sender_id: true,
+                read_at: true,
+                content: true,
+                img_url: true,
+                video_url: true,
+                send_at: true,
             },
         });
     }
@@ -42,16 +51,17 @@ export class MessageService {
                 chat_id: Number(chatId),
             },
             orderBy: {
-                send_at: 'desc', 
+                send_at: 'desc',
             },
-            take: 50, 
+            take: 50,
             select: {
                 id: true,
                 sender_id: true,
-                chat_id: true,
-                content: true,
-                send_at: true,
                 read_at: true,
+                content: true,
+                img_url: true,
+                video_url: true,
+                send_at: true,
             },
         });
 
@@ -60,7 +70,7 @@ export class MessageService {
                 ...message,
                 send_at: message.send_at,
             }))
-            .reverse(); 
+            .reverse();
     }
 
     public async getUpdatedLastMessage(userId: string, senderId: string) {

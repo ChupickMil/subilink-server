@@ -12,9 +12,10 @@ export class ChatController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('get-chats')
-    async getFriends(@Req() req) {
+    async getFriends(@Req() req, @Query() query: { search: string }) {
 		const userId = req.session.passport.user;
-        return await this.chatService.getChats(userId);
+        const search = query.search
+        return await this.chatService.getChats(userId, search);
     }
 
     @ApiResponse({ status: 201 })

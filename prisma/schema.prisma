@@ -46,8 +46,8 @@ model User {
   chat_participant Chat_participant?
   followedFriends  Friend[]          @relation("FollowedRelation")
   followerFriends  Friend[]          @relation("FollowerRelation")
-  chatFirstUser    Chat?             @relation("FirstUser")
-  chatSecondUser   Chat?             @relation("SecondUser")
+  chatFirstUser    Chat[]             @relation("FirstUser")
+  chatSecondUser   Chat[]             @relation("SecondUser")
 
   @@map("user")
 }
@@ -78,8 +78,8 @@ model Setting {
 
 model Chat {
   id          Int      @id @unique @default(autoincrement())
-  first_user  Int      @unique
-  second_user Int      @unique
+  first_user  Int      
+  second_user Int      
   created_at  DateTime @default(now()) @map("created_at")
 
   Message     Message[]

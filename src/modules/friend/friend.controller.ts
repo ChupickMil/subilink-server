@@ -1,10 +1,9 @@
 import {
-    Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
-    Post,
     Query,
     Req,
     UseGuards
@@ -29,13 +28,23 @@ export class FriendController {
         return await this.friendService.getFriends(userId, search);
     }
 
+	// @ApiResponse({ status: 200 })
+    // @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    // @HttpCode(HttpStatus.OK)
+    // @Post('add-friend')
+    // async addFriend(@Req() req, @Body() body: {friendId: string}) {
+	// 	const userId = req.session.passport.user;
+    //     return await this.friendService.addFriend(userId, body.friendId);
+    // }
+    
 	@ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Post('add-friend')
-    async addFriend(@Req() req, @Body() body: {friendId: string}) {
+    @Delete('delete')
+    async addFriend(@Req() req, @Query() query: {friendId: string}) {
 		const userId = req.session.passport.user;
-        return await this.friendService.addFriend(userId, body.friendId);
+        const friendId = query.friendId;
+        return await this.friendService.deleteFriend(userId, friendId);
     }
 
     @ApiResponse({ status: 200 })

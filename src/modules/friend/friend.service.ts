@@ -76,13 +76,88 @@ export class FriendService {
         });
     }
 
+    async acceptRequest(userId: string, friendId: string) {
+        try {
+            const res = await this.prisma.friend.updateMany({
+                where: {
+                    follower_id: Number(friendId),
+                    followed_id: Number(userId),
+                    status: FriendStatuses.pending,
+                },
+                data: {
+                    status: FriendStatuses.confirmed,
+                },
+            });
+        } catch (err) {
+            throw new Error(err);
+        }
+    }
+
+    async cancelOutgoingRequest(userId: string, friendId: string) {
+        try {
+            const res = await this.prisma.friend.deleteMany({
+                where: {
+                    follower_id: Number(userId),
+                    followed_id: Number(friendId),
+                    status: FriendStatuses.pending,
+                },
+            });
+        } catch (err) {
+            throw new Error(err);
+        }
+    }
+
+    async deleteFriend(userId: string, friendId: string): Promise<void> {
+        try {
+            const [userIdNum, friendIdNum] = [Number(userId), Number(friendId)];
+
+            const friendship = await this.prisma.friend.findFirst({
+                where: {
+                    status: FriendStatuses.confirmed,
+                    OR: [
+                        { follower_id: userIdNum, followed_id: friendIdNum },
+                        { follower_id: friendIdNum, followed_id: userIdNum },
+                    ],
+                },
+            });
+
+            if (!friendship)
+                throw new Error('Friendship not found or not confirmed');
+
+            const isFollowerInitiator = friendship.follower_id === userIdNum;
+
+            await this.prisma.friend.updateMany({
+                where: {
+                    status: FriendStatuses.confirmed,
+                    follower_id: isFollowerInitiator ? userIdNum : friendIdNum,
+                    followed_id: isFollowerInitiator ? friendIdNum : userIdNum,
+                },
+                data: {
+                    status: FriendStatuses.pending,
+                    ...(isFollowerInitiator && {
+                        follower_id: friendIdNum,
+                        followed_id: userIdNum,
+                    }),
+                },
+            });
+        } catch (err) {
+            throw new Error(`Error while deleting friend: ${err.message}`);
+        }
+    }
+
     async getRequests(userId: string, type: 'incoming' | 'outgoing') {
         const users = new Array<{ id: number; name: string | null }>();
 
         const whereClause =
             type === 'incoming'
-                ? { followed_id: Number(userId), status: FriendStatuses.pending }
-                : { follower_id: Number(userId), status: FriendStatuses.pending };
+                ? {
+                      followed_id: Number(userId),
+                      status: FriendStatuses.pending,
+                  }
+                : {
+                      follower_id: Number(userId),
+                      status: FriendStatuses.pending,
+                  };
 
         const requests = await this.prisma.friend.findMany({
             where: whereClause,
@@ -90,8 +165,6 @@ export class FriendService {
                 [type === 'incoming' ? 'follower_id' : 'followed_id']: true,
             },
         });
-
-        console.log(requests)
 
         await Promise.all(
             requests.map(async (request) => {
