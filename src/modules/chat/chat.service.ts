@@ -59,6 +59,7 @@ export class ChatService {
                     },
                     take: 1, // Берем только одно сообщение
                     select: {
+                        read_at: true,
                         sender_id: true,
                         content: true,
                         created_at: true,
@@ -84,6 +85,7 @@ export class ChatService {
             lastMessage: chat.Message[0]?.content ?? '',
             sender_id: chat.Message[0]?.sender_id ?? '',
             lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
+            read_at: chat.Message[0]?.read_at ?? null,
             user:
                 chat.first_user === Number(userId)
                     ? chat.second_user === Number(userId)

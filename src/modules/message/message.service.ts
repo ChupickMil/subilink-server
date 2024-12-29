@@ -31,6 +31,7 @@ export class MessageService {
             },
             select: {
                 id: true,
+                chat_id: true,
                 sender_id: true,
                 read_at: true,
                 content: true,
@@ -56,6 +57,7 @@ export class MessageService {
             take: 50,
             select: {
                 id: true,
+                chat_id: true,
                 sender_id: true,
                 read_at: true,
                 content: true,
@@ -92,5 +94,22 @@ export class MessageService {
         });
 
         return lastMessage[0];
+    }
+
+    async updateMessageRead(
+        dto: { message_id: string; chat_id: string; read_at: string }[],
+    ) {
+        const updatePromises = dto.map(async (message) =>
+            await this.prisma.message.update({
+                where: {
+                    id: Number(message.message_id)
+                },
+                data: {
+                    read_at: new Date(message.read_at),
+                },
+            }),
+        );
+
+        await Promise.all(updatePromises);
     }
 }

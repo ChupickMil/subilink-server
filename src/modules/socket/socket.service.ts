@@ -94,7 +94,11 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
         if (friendSocket) {
             // Уведомляем друга
-            friendSocket.emit('message-notification', { ...result, userId, recipientId });
+            friendSocket.emit('message-notification', {
+                ...result,
+                userId,
+                recipientId,
+            });
         } else {
             console.log(`Friend ${recipientId} is not connected`);
         }
@@ -156,7 +160,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await this.friendService.cancelOutgoingRequest(dto.userId, dto.friendId);
+        await this.friendService.cancelOutgoingRequest(
+            dto.userId,
+            dto.friendId,
+        );
 
         // Подтверждаем действие инициатору
         client.emit('friend-cancel-outgoing-request', { success: true });
@@ -180,5 +187,54 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         console.log('Online users: ' + onlineUser);
 
         client.emit('online-users', onlineUser);
+    }
+
+    @SubscribeMessage('message-read')
+    async handleMessageRead(
+        @MessageBody()
+        dto: {
+            message_id: string;
+            chat_id: string;
+            user_id: string;
+            friend_id: string;
+            read_at: string;
+        }[],
+        @ConnectedSocket() client: any,
+    ) {
+        const groupedMessages = dto.reduce(
+            (acc, curr) => {
+                acc[curr.friend_id] = acc[curr.friend_id] || [];
+                acc[curr.friend_id].push(curr);
+                return acc;
+            },
+            {} as Record<
+                string,
+                { message_id: string; read_at: string; user_id: string }[]
+            >,
+        );
+
+        console.log(groupedMessages);
+
+        for (const [friend_id, messages] of Object.entries(groupedMessages)) {
+            const friendSocket = this.activeSockets.get(friend_id);
+
+            messages.forEach((message) => {
+                const messageWithFriendId = {
+                    ...message,
+                    friend_id: friend_id, // Явное указание friend_id
+                    user_id: message.user_id, // Извлечение user_id из сообщения
+                };
+
+                if (friendSocket) {
+                    friendSocket.emit('message-read', messageWithFriendId);
+                } else {
+                    console.log(`Friend ${friend_id} is not connected`);
+                }
+            });
+        }
+
+        await this.messageService.updateMessageRead(dto);
+
+        // client.emit('online-users', onlineUser);
     }
 }
