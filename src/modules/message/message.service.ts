@@ -42,14 +42,23 @@ export class MessageService {
         });
     }
 
-    public async getMessages(userId: string, senderId: string) {
+    public async getMessages(
+        userId: string,
+        senderId: string,
+        param: string | null,
+    ) {
         if (!senderId || !userId) return;
 
         const chatId = await this.chatService.getChatId(userId, senderId);
 
+        const paramQuery = param != null && !isNaN(Number(param))
+                ? { id: { lt: Number(param) } }
+                : {}
+
         const messages = await this.prisma.message.findMany({
             where: {
                 chat_id: Number(chatId),
+                ...paramQuery
             },
             orderBy: {
                 send_at: 'desc',
@@ -99,15 +108,16 @@ export class MessageService {
     async updateMessageRead(
         dto: { message_id: string; chat_id: string; read_at: string }[],
     ) {
-        const updatePromises = dto.map(async (message) =>
-            await this.prisma.message.update({
-                where: {
-                    id: Number(message.message_id)
-                },
-                data: {
-                    read_at: new Date(message.read_at),
-                },
-            }),
+        const updatePromises = dto.map(
+            async (message) =>
+                await this.prisma.message.update({
+                    where: {
+                        id: Number(message.message_id),
+                    },
+                    data: {
+                        read_at: new Date(message.read_at),
+                    },
+                }),
         );
 
         await Promise.all(updatePromises);

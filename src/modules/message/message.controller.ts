@@ -13,10 +13,11 @@ export class MessageController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('get-messages')
-	async getMessages(@Req() req, @Query() query) {
+	async getMessages(@Req() req, @Query() query: {senderId: string, param: string}) {
 		const userId = req.session.passport.user;
 		const senderId = query.senderId
-		return await this.messagesService.getMessages(userId, senderId);
+		const param = query.param
+		return await this.messagesService.getMessages(userId, senderId, param);
 	}
 
 	@ApiResponse({ status: 201, type: FriendsDto })
