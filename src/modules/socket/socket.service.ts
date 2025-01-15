@@ -16,6 +16,7 @@ interface IChatMessageDto {
     recipientId: string;
     content: string;
     time: string;
+    imgUrls: string[]
 }
 
 interface IFriendsRequestDto {
@@ -58,12 +59,12 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
-    @SubscribeMessage('message')
+    @SubscribeMessage('messages')
     async handleEvent(
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
-        const { userId, recipientId, content } = dto;
+        const { userId, recipientId, content, imgUrls } = dto;
 
         // Проверяем существование чата или создаем новый
         const isHasChat = await this.chatService.getIsHasChat(
@@ -84,17 +85,18 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             userId,
             chatId,
             content,
+            imgUrls
         );
 
         // Уведомляем отправителя
-        client.emit('message', { ...result, userId, recipientId });
+        client.emit('messages', { ...result, userId, recipientId });
 
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(recipientId));
 
         if (friendSocket) {
             // Уведомляем друга
-            friendSocket.emit('message-notification', {
+            friendSocket.emit('messages-notification', {
                 ...result,
                 userId,
                 recipientId,
@@ -104,7 +106,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
-    @SubscribeMessage('friend-request')
+    @SubscribeMessage('friends-request')
     async handleFriendsRequests(
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
@@ -114,7 +116,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
         if (friendSocket) {
             // Уведомляем друга
-            friendSocket.emit('friends-requests-notification', {
+            friendSocket.emit('friends-request-notification', {
                 message: `Новый запрос в друзья от пользователя ${dto.userId}`,
                 requesterId: dto.userId,
             });
@@ -126,10 +128,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         await this.friendService.addFriend(dto.userId, dto.friendId);
 
         // Подтверждаем действие инициатору
-        client.emit('friends-requests', { success: true });
+        client.emit('friends-request', { success: true });
     }
 
-    @SubscribeMessage('friend-accept-request')
+    @SubscribeMessage('friends-accept-requests')
     async handleFriendsAcceptRequest(
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
@@ -139,7 +141,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
         if (friendSocket) {
             // Уведомляем друга
-            friendSocket.emit('friend-request-notification', {
+            friendSocket.emit('friends-request-notification', {
                 message: `Ваш запрос принял ${dto.userId}`,
                 requesterId: dto.userId,
             });
@@ -151,10 +153,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         await this.friendService.acceptRequest(dto.userId, dto.friendId);
 
         // Подтверждаем действие инициатору
-        client.emit('friend-accept-request', { success: true });
+        client.emit('friends-accept-request', { success: true });
     }
 
-    @SubscribeMessage('friend-cancel-outgoing-request')
+    @SubscribeMessage('friends-cancel-outgoing-request')
     async handleFriendsCancelRequest(
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
@@ -166,7 +168,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         );
 
         // Подтверждаем действие инициатору
-        client.emit('friend-cancel-outgoing-request', { success: true });
+        client.emit('friends-cancel-outgoing-request', { success: true });
     }
 
     @SubscribeMessage('online-users')
@@ -189,7 +191,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('online-users', onlineUser);
     }
 
-    @SubscribeMessage('message-read')
+    @SubscribeMessage('messages-read')
     async handleMessageRead(
         @MessageBody()
         dto: {
@@ -226,7 +228,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 };
 
                 if (friendSocket) {
-                    friendSocket.emit('message-read', messageWithFriendId);
+                    friendSocket.emit('messages-read', messageWithFriendId);
                 } else {
                     console.log(`Friend ${friend_id} is not connected`);
                 }

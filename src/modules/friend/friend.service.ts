@@ -65,7 +65,9 @@ export class FriendService {
                 followed_id: Number(friendId),
             },
         });
-
+        console.log(userId)
+        console.log(friendId)
+        console.log(isExist)
         if (isExist) return;
 
         await this.prisma.friend.create({

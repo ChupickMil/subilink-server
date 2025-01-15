@@ -3,12 +3,12 @@ import {
     Controller,
     Get,
     HttpStatus,
-    Post,
+    Patch,
     Query,
     Req,
     Res,
     Session,
-    UseGuards,
+    UseGuards
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 
@@ -19,13 +19,13 @@ import { UpdateUserDto } from './dto'
 import { GlobalUsers } from './dto/globalUser.dto'
 import { UserService } from './user.service'
 
-@Controller('user')
+@Controller('users')
 export class UserController {
     constructor(private readonly userService: UserService) {}
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Get('get-user')
+    @Get('user')
     async getUser(@Req() req) {
         const id = req.session.passport.user;
         return await this.userService.publicUser(id, 'id', true);
@@ -33,7 +33,7 @@ export class UserController {
 
     @ApiResponse({ status: 200, type: UpdateUserDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Post('update-name')
+    @Patch('update-name')
     async updateName(
         @Session() session,
         @Body() user: UpdateUserDto,
@@ -47,7 +47,7 @@ export class UserController {
 
     @ApiResponse({ status: 200, type: GlobalUsers })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Get('get-global-users')
+    @Get('global-users')
     async getGlobalUsers(@Req() req, @Query() query: { search: string }) {
         const userId = req.session.passport.user;
         const search = query.search;

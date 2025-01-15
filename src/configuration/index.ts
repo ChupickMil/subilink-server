@@ -9,4 +9,5 @@ export default () => ({
     redis_port: process.env.REDIS_PORT,
     cache_ttl: process.env.REDIS_TTL,
     max_item_in_cache: process.env.MAX_ITEM_IN_CACHE,
+    // uploads_path: process.env.UPLOADS_PATH
 });

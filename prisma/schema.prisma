@@ -104,12 +104,12 @@ model Group {
 
 model Message {
   id         Int       @id @default(autoincrement())
-  sender_id  Int       
+  sender_id  Int      
   chat_id    Int?     
   group_id   Int?     
   read_at    DateTime?
   content    String?
-  img_url    String?
+  img_url    String[]
   video_url  String?
   deleted_at DateTime?
   send_at    DateTime  @default(now())

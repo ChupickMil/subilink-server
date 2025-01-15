@@ -90,7 +90,7 @@ export class AuthController {
 
     @ApiResponse({ status: 201, type: GenerateTwoFADto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Get('generate-2fa')
+    @Post('generate-2fa')
     async generate2FA(@Body() { phone }: GenerateTwoFADto) {
         return await this.authService.generate2FA(phone);
     }
