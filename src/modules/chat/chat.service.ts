@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UserService } from '../user/user.service'
-import { IFilteredChat } from './dto/filteredChat'
+import { IChat, IFilteredChat } from './types'
 
 @Injectable()
 export class ChatService {
@@ -32,15 +32,21 @@ export class ChatService {
     }
 
     public async createChat(userId: string, recipientId: string) {
-        await this.prisma.chat.create({
+        const chat = await this.prisma.chat.create({
             data: {
                 first_user: Number(userId),
                 second_user: Number(recipientId),
             },
         });
+        return !!chat;
     }
 
-    public async getChats(userId: string, search?: string) {
+    public async getChats(userId: string);
+    public async getChats(userId: string, search: string);
+    public async getChats(
+        userId: string,
+        search?: string,
+    ): Promise<IFilteredChat[]> {
         const chats = await this.prisma.chat.findMany({
             where: {
                 OR: [
@@ -63,6 +69,7 @@ export class ChatService {
                         sender_id: true,
                         content: true,
                         created_at: true,
+                        img_uuids: true,
                     },
                 },
                 user: {
@@ -81,18 +88,7 @@ export class ChatService {
         });
 
         // Возвращаем чат без самого пользователя
-        const filteredChats = chats.map((chat) => ({
-            lastMessage: chat.Message[0]?.content ?? '',
-            sender_id: chat.Message[0]?.sender_id ?? '',
-            lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
-            read_at: chat.Message[0]?.read_at ?? null,
-            user:
-                chat.first_user === Number(userId)
-                    ? chat.second_user === Number(userId)
-                        ? undefined
-                        : chat.user_second
-                    : chat.user,
-        }));
+        const filteredChats = await this.getFilteredChats(chats, userId);
 
         if (search) {
             return await this.getSearchedChats(filteredChats, search);
@@ -101,7 +97,26 @@ export class ChatService {
         return filteredChats;
     }
 
-    private async getSearchedChats(filteredChats: IFilteredChat[], search: string) {
+    private async getFilteredChats(chats: IChat[], userId: string) {
+        return chats.map((chat) => ({
+            lastMessage: chat.Message[0]?.content ?? '',
+            sender_id: chat.Message[0]?.sender_id ?? '',
+            lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
+            read_at: chat.Message[0]?.read_at ?? null,
+            imgUuidsLength: chat.Message[0]?.img_uuids.length ?? 0,
+            user:
+                chat.first_user === Number(userId)
+                    ? chat.second_user === Number(userId)
+                        ? undefined
+                        : chat.user_second
+                    : chat.user,
+        }));
+    }
+
+    private async getSearchedChats(
+        filteredChats: IFilteredChat[],
+        search: string,
+    ) {
         return await Promise.all(
             filteredChats.map(async (chat) => {
                 if (
@@ -133,7 +148,10 @@ export class ChatService {
                 id: true,
             },
         });
-        return chat?.id;
+
+        if (!chat) return false;
+
+        return chat.id;
     }
 
     public async getChatInfo(chatId: string) {

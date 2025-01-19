@@ -16,8 +16,7 @@ import { ConfigService } from '@nestjs/config'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import * as fs from 'fs'
-import { diskStorage } from 'multer'
-import * as path from 'path'
+import { memoryStorage } from 'multer'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { MessageService } from './message.service'
@@ -68,32 +67,16 @@ export class MessageController {
     @HttpCode(HttpStatus.OK)
     @UseInterceptors(
         FilesInterceptor('files', 10, {
-            storage: diskStorage({
-                destination: (req, _, cb) => {
-                    const userId = req.session.passport!.user;
-
-                    const userDir = `./uploads/${userId}`;
-                    if (!fs.existsSync(userDir)) {
-                        fs.mkdirSync(userDir, { recursive: true });
-                    }
-
-                    cb(null, userDir);
-                },
-                filename: (_, file, cb) => {
-                    const originalName = Buffer.from(
-                        file.originalname,
-                        'latin1',
-                    ).toString('utf8');
-                    cb(null, `${Date.now()}-${originalName}`);
-                },
-            }),
+            storage: memoryStorage(),
         }),
     )
-    @Post('send-file')
+    @Post('save-file')
     async sendFile(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
         const userId = req.session.passport.user;
+        const uuids = req.body.uuid;
+        const uuidsArray = Array.isArray(uuids) ? uuids : [uuids];
 
-        console.log(files);
+        await this.messagesService.saveFile(userId, files, uuidsArray);
     }
 
     // @ApiResponse({ status: 201, type: FriendsDto })
@@ -110,35 +93,51 @@ export class MessageController {
     // }
 
     // image
-    @ApiResponse({ status: 201 })
+    // @ApiResponse({ status: 201 })
     // @UseGuards(AuthenticatedGuard, TwoFAGuard)
     // @HttpCode(HttpStatus.OK)
-    @Get('image/:name')
-    async serveImage(@Res() res, @Req() req, @Param('name') name: string) {
-        const userId = 4
-        const filePath = path.join(
-            process.cwd(),
-            'uploads',
-            String(userId),
-            String(name),
+    // @Get('image/:name')
+    // async serveImage(@Res() res, @Req() req, @Param('name') name: string) {
+    //     const userId = 4;
+    //     const filePath = path.join(
+    //         process.cwd(),
+    //         'uploads',
+    //         String(userId),
+    //         String(name),
+    //     );
+
+    //     try {
+    //         if (fs.existsSync(filePath)) {
+    //             res.sendFile(filePath);
+    //         } else {
+    //             res.status(HttpStatus.NOT_FOUND).json({
+    //                 message: 'File not found',
+    //             });
+    //         }
+    //     } catch (err) {
+    //         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+    //             message: 'Error serving file',
+    //         });
+    //     }
+    // }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('image/:uuid')
+    async getImage(@Req() req, @Param('uuid') uuid: string, @Res() res) {
+        const userId = req.session.passport.user;
+
+        const data = await this.messagesService.getImage(uuid);
+
+        if (!data) return;
+        console.log(data.original_name);
+        res.setHeader('Content-Type', data.mime_type);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(data.original_name)}"`,
         );
 
-        console.log(filePath)
-
-        try {
-            if (fs.existsSync(filePath)) {
-                res.sendFile(filePath);
-                console.log("find")
-            } else {
-                res.status(HttpStatus.NOT_FOUND).json({
-                    message: 'File not found',
-                });
-            }
-        } catch (err) {
-            console.log(err);
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                message: 'Error serving file',
-            });
-        }
+        fs.createReadStream(data.path).pipe(res);
     }
 }

@@ -16,7 +16,7 @@ interface IChatMessageDto {
     recipientId: string;
     content: string;
     time: string;
-    imgUrls: string[]
+    imgUuids: string[]
 }
 
 interface IFriendsRequestDto {
@@ -64,15 +64,17 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
-        const { userId, recipientId, content, imgUrls } = dto;
+        const { userId, recipientId, content, imgUuids } = dto;
 
         // Проверяем существование чата или создаем новый
         const isHasChat = await this.chatService.getIsHasChat(
             userId,
             recipientId,
         );
+
         if (!isHasChat) {
-            await this.chatService.createChat(userId, recipientId);
+            const isCreated = await this.chatService.createChat(userId, recipientId);
+            if(!isCreated) throw new Error('Failed to create chat')
         }
 
         // Получаем ID чата
@@ -80,12 +82,14 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             await this.chatService.getChatId(userId, recipientId),
         );
 
+        if(!chatId) throw new Error("Chat not found")
+
         // Отправляем сообщение
         const result = await this.messageService.sendNewMessageChat(
             userId,
             chatId,
             content,
-            imgUrls
+            imgUuids
         );
 
         // Уведомляем отправителя

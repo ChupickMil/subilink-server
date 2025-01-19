@@ -1,4 +1,4 @@
-interface IFilteredChat {
+class FilteredChatDto {
     lastMessage: string;
     sender_id: number;
     lastMessageTime: string;
@@ -10,6 +10,7 @@ interface IFilteredChat {
         | undefined;
 }
 
-export type {
-	IFilteredChat
+export {
+    FilteredChatDto
 }
+
