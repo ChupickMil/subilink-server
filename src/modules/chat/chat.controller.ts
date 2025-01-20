@@ -46,6 +46,6 @@ export class ChatController {
         const chatId = query.chatId;
         if (!chatId) return res.status(HttpStatus.BAD_REQUEST);
 
-        return await this.chatService.getChatInfo(chatId);
+        res.send(await this.chatService.getChatInfo(chatId));
     }
 }

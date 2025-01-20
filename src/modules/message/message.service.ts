@@ -110,6 +110,8 @@ export class MessageService {
     public async getUpdatedLastMessage(userId: string, senderId: string) {
         const chatId = await this.chatService.getChatId(userId, senderId);
 
+        if(!chatId) throw new Error("Chat id not found")
+
         const lastMessage = await this.prisma.message.findMany({
             where: {
                 chat_id: chatId,
