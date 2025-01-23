@@ -131,12 +131,13 @@ export class MessageController {
         const data = await this.messagesService.getImage(uuid);
 
         if (!data) return;
-        console.log(data.original_name);
         res.setHeader('Content-Type', data.mime_type);
         res.setHeader(
             'Content-Disposition',
             `inline; filename="${encodeURIComponent(data.original_name)}"`,
         );
+
+        console.log(1)
 
         fs.createReadStream(data.path).pipe(res);
     }
