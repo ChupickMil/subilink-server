@@ -25,14 +25,34 @@ export class MessageService {
         sender_id: string,
         chatId: string,
         content: string,
-        imgUuids?: string[],
+        files?: string[],
     ) {
+        const filesToConnect = Array<{ id: number }>();
+
+        if (files?.length) {
+            for (const uuid of files) {
+                const file = await this.prisma.file.findUnique({
+                    where: {
+                        uuid: uuid,
+                    },
+                });
+
+                if (file && file.id) {
+                    filesToConnect.push({ id: file.id });
+                } else {
+                    console.log(`File with uuid ${uuid} not found`);
+                }
+            }
+        }
+
         return await this.prisma.message.create({
             data: {
                 sender_id: Number(sender_id),
                 chat_id: Number(chatId),
                 content: content,
-                img_uuids: imgUuids ?? [],
+                files: {
+                    connect: filesToConnect,
+                },
             },
             select: {
                 id: true,
@@ -40,8 +60,7 @@ export class MessageService {
                 sender_id: true,
                 read_at: true,
                 content: true,
-                img_uuids: true,
-                video_url: true,
+                files: true,
                 send_at: true,
             },
         });
@@ -88,8 +107,7 @@ export class MessageService {
                 sender_id: true,
                 read_at: true,
                 content: true,
-                img_uuids: true,
-                video_url: true,
+                files: true,
                 send_at: true,
                 user: {
                     select: {
@@ -110,7 +128,7 @@ export class MessageService {
     public async getUpdatedLastMessage(userId: string, senderId: string) {
         const chatId = await this.chatService.getChatId(userId, senderId);
 
-        if(!chatId) throw new Error("Chat id not found")
+        if (!chatId) throw new Error('Chat id not found');
 
         const lastMessage = await this.prisma.message.findMany({
             where: {
@@ -156,9 +174,9 @@ export class MessageService {
         const userDir = path.join('uploads', String(userId));
 
         try {
-            if (await !fs.access(userDir)) {
+            await fs.access(userDir).catch(async () => {
                 await fs.mkdir(userDir, { recursive: true });
-            }
+            });
         } catch (err) {
             throw new Error('Failed to create directory for user files');
         }
@@ -173,7 +191,6 @@ export class MessageService {
             ).toString('utf8');
 
             const filePath = path.join(userDir, uuids[i] + typeFile);
-            console.log(filePath);
 
             try {
                 const fullPath = path.join(process.cwd(), filePath);
@@ -201,18 +218,53 @@ export class MessageService {
 
     async getImage(
         uuid: string,
-    ): Promise<{ path: string; original_name: string, mime_type: string } | undefined | null> {
+        userId: string
+    ): Promise<
+        | { path: string; original_name: string; mime_type: string }
+        | undefined
+        | null
+    > {
         const img = await this.prisma.file.findFirst({
             where: {
                 uuid: uuid,
+                Message: {
+                    some: {
+                        chat: {
+                            OR: [
+                                {
+                                    first_user: Number(userId)
+                                },
+                                {
+                                    second_user: Number(userId)
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            select: {
+                path: true,
+                original_name: true,
+                mime_type: true,
+            },
+        });
+
+        return img;
+    }
+
+    async downloadFile(uuid: string, userId: string) {
+        const file = await this.prisma.file.findFirst({
+            where: {
+                uuid: uuid,
+                user_id: Number(userId)
             },
             select: {
                 path: true,
                 original_name: true,
                 mime_type: true
-            },
-        });
+            }
+        })
 
-        return img;
+        return file
     }
 }

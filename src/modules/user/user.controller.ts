@@ -33,7 +33,7 @@ export class UserController {
 
     @ApiResponse({ status: 200, type: UpdateUserDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Patch('update-name')
+    @Patch('name')
     async updateName(
         @Session() session,
         @Body() user: UpdateUserDto,

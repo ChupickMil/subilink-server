@@ -110,12 +110,11 @@ model Message {
   group_id   Int?
   read_at    DateTime?
   content    String?
-  img_uuids    String[]
-  video_url  String?
   deleted_at DateTime?
   send_at    DateTime  @default(now())
   created_at DateTime  @default(now()) @map("created_at")
 
+  files File[]
   user  User   @relation(fields: [sender_id], references: [id])
   chat  Chat?  @relation(fields: [chat_id], references: [id])
   group Group? @relation(fields: [group_id], references: [id])
@@ -156,10 +155,11 @@ model File {
   original_name String
   mime_type     String
   size          Int
-  type String
+  type          String
   user_id       Int
 
-  user User @relation(fields: [user_id], references: [id])
+  user    User      @relation(fields: [user_id], references: [id])
+  Message Message[]
 
   @@map("file")
 }

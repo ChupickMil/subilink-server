@@ -10,19 +10,8 @@ import {
 import { ChatService } from '../chat/chat.service'
 import { FriendService } from '../friend/friend.service'
 import { MessageService } from '../message/message.service'
+import { IChatMessageDto, IFriendsRequestDto } from './types'
 
-interface IChatMessageDto {
-    userId: string;
-    recipientId: string;
-    content: string;
-    time: string;
-    imgUuids: string[]
-}
-
-interface IFriendsRequestDto {
-    userId: string;
-    friendId: string; // ID друга, которому отправляется запрос
-}
 
 @Injectable()
 @WebSocketGateway({
@@ -64,7 +53,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
-        const { userId, recipientId, content, imgUuids } = dto;
+        const { userId, recipientId, content, fileUuids } = dto;
 
         // Проверяем существование чата или создаем новый
         const isHasChat = await this.chatService.getIsHasChat(
@@ -89,7 +78,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             userId,
             chatId,
             content,
-            imgUuids
+            fileUuids
         );
 
         // Уведомляем отправителя

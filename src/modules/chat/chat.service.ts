@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UserService } from '../user/user.service'
-import { IChat, IFilteredChat } from './types'
+import { ChatWithRelations, IFilteredChat } from './types'
 
 @Injectable()
 export class ChatService {
@@ -69,7 +69,7 @@ export class ChatService {
                         sender_id: true,
                         content: true,
                         created_at: true,
-                        img_uuids: true,
+                        files: true,
                     },
                 },
                 user: {
@@ -97,13 +97,13 @@ export class ChatService {
         return filteredChats;
     }
 
-    private async getFilteredChats(chats: IChat[], userId: string) {
+    private async getFilteredChats(chats: ChatWithRelations[], userId: string) {
         return chats.map((chat) => ({
             lastMessage: chat.Message[0]?.content ?? '',
             sender_id: chat.Message[0]?.sender_id ?? '',
             lastMessageTime: chat.Message[0]?.created_at.toLocaleTimeString(),
             read_at: chat.Message[0]?.read_at ?? null,
-            imgUuidsLength: chat.Message[0]?.img_uuids.length ?? 0,
+            fileUuidsLength: chat.Message[0]?.files.length ?? 0,
             user:
                 chat.first_user === Number(userId)
                     ? chat.second_user === Number(userId)

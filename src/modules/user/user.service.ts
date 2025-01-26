@@ -127,7 +127,6 @@ export class UserService {
         return await Promise.all(
             users.map(async (user) => {
                 const publicUser = await this.publicUser(user.id, 'id', false);
-                console.log(publicUser)
                 if (
                     publicUser?.name &&
                     publicUser.name.toLowerCase().includes(search.toLowerCase())

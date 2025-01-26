@@ -128,7 +128,9 @@ export class MessageController {
     async getImage(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
 
-        const data = await this.messagesService.getImage(uuid);
+        if(!userId) return
+
+        const data = await this.messagesService.getImage(uuid, userId);
 
         if (!data) return;
         res.setHeader('Content-Type', data.mime_type);
@@ -137,8 +139,33 @@ export class MessageController {
             `inline; filename="${encodeURIComponent(data.original_name)}"`,
         );
 
-        console.log(1)
-
         fs.createReadStream(data.path).pipe(res);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('file/:uuid')
+    async downloadFile(@Req() req, @Param('uuid') uuid: string, @Res() res) {
+        const userId = req.session.passport.user;
+    
+        if (!userId) return res.status(403).send('Unauthorized');
+    
+        const data = await this.messagesService.downloadFile(uuid, userId);
+
+        if (!data) return res.status(404).send('File not found');
+    
+        const filePath = data.path;
+        const fileName = data.original_name;
+        const mimeType = data.mime_type || 'application/octet-stream';
+    
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        
+        const fileStat = fs.statSync(filePath);
+        res.setHeader('Content-Length', fileStat.size);
+
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
     }
 }
