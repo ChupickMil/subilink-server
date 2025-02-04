@@ -17,6 +17,8 @@ import { IChatMessageDto, IFriendsRequestDto } from './types'
 @WebSocketGateway({
     cors: {
         origin: 'http://localhost:3000', // точный домен
+        // origin: 'http://192.168.31.168:3000', // точный домен
+        // origin: 'http://192.168.31.179:3000', // точный домен
     },
 })
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {

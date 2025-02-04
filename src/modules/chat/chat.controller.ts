@@ -1,5 +1,6 @@
 import {
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -20,7 +21,7 @@ import { FilteredChatDto } from './dto/FilteredChat.dto'
 export class ChatController {
     constructor(private readonly chatService: ChatService) {}
 
-    @ApiResponse({ status: 200, type: FilteredChatDto})
+    @ApiResponse({ status: 200, type: FilteredChatDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('chats')
@@ -47,5 +48,16 @@ export class ChatController {
         if (!chatId) return res.status(HttpStatus.BAD_REQUEST);
 
         res.send(await this.chatService.getChatInfo(chatId));
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Delete('chats')
+    async deleteMessages(@Req() req, @Query() query: { ids: string }) {
+        const userId = req.session.passport.user;
+        const ids = query.ids.split(',');
+
+        return await this.chatService.deleteChats(ids, userId);
     }
 }

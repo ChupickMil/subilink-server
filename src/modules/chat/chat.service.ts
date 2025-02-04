@@ -164,4 +164,8 @@ export class ChatService {
         );
         return user;
     }
+
+    public async deleteChats(ids: string[], userId: string) {
+
+    }
 }

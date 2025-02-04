@@ -1,5 +1,6 @@
 import {
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -20,6 +21,7 @@ import { memoryStorage } from 'multer'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { MessageService } from './message.service'
+import { ModalButtonAnswers } from './types'
 
 @Controller('messages')
 export class MessageController {
@@ -39,7 +41,22 @@ export class MessageController {
         const userId = req.session.passport.user;
         const senderId = query.senderId;
         const param = query.param;
-        return await this.messagesService.getMessages(userId, senderId, param);
+        return await this.messagesService.getPublicMessages(userId, senderId, param);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Delete('messages')
+    async deleteMessages(
+        @Req() req,
+        @Query() query: { ids: string, for_everyone: ModalButtonAnswers },
+    ) {
+        const userId = req.session.passport.user;
+        const ids = query.ids.split(',')
+        const forEveryone = query.for_everyone
+
+        return await this.messagesService.deleteMessages(ids, forEveryone, userId);
     }
 
     @ApiResponse({ status: 201 })
@@ -53,7 +70,7 @@ export class MessageController {
         const userId = req.session.passport.user;
         const senderId = query.senderId;
         const search = query.search;
-        return await this.messagesService.getMessages(
+        return await this.messagesService.getPublicMessages(
             userId,
             senderId,
             null,

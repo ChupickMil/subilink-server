@@ -4,6 +4,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ChatService } from '../chat/chat.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { ModalButtonAnswers } from './types'
 
 @Injectable()
 export class MessageService {
@@ -66,7 +67,7 @@ export class MessageService {
         });
     }
 
-    public async getMessages(
+    public async getPublicMessages(
         userId: string,
         senderId: string,
         param: string | null,
@@ -90,10 +91,26 @@ export class MessageService {
               }
             : {};
 
-        // const searchSelect = search ?
         const messages = await this.prisma.message.findMany({
             where: {
                 chat_id: Number(chatId),
+                OR: [
+                    { delete_for: { equals: null } },
+                    {
+                        NOT: [
+                            {
+                                OR: [
+                                    { delete_for: { has: Number(userId) } },
+                                    {
+                                        delete_for: {
+                                            has: ModalButtonAnswers.DELETE_EVERYONE,
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
                 ...paramQuery,
                 ...searchQuery,
             },
@@ -218,7 +235,7 @@ export class MessageService {
 
     async getImage(
         uuid: string,
-        userId: string
+        userId: string,
     ): Promise<
         | { path: string; original_name: string; mime_type: string }
         | undefined
@@ -232,15 +249,15 @@ export class MessageService {
                         chat: {
                             OR: [
                                 {
-                                    first_user: Number(userId)
+                                    first_user: Number(userId),
                                 },
                                 {
-                                    second_user: Number(userId)
-                                }
-                            ]
-                        }
-                    }
-                }
+                                    second_user: Number(userId),
+                                },
+                            ],
+                        },
+                    },
+                },
             },
             select: {
                 path: true,
@@ -256,15 +273,70 @@ export class MessageService {
         const file = await this.prisma.file.findFirst({
             where: {
                 uuid: uuid,
-                user_id: Number(userId)
+                user_id: Number(userId),
             },
             select: {
                 path: true,
                 original_name: true,
-                mime_type: true
-            }
-        })
+                mime_type: true,
+            },
+        });
 
-        return file
+        return file;
+    }
+
+    public async deleteMessages(
+        ids: string[],
+        forEveryone: ModalButtonAnswers,
+        userId: string,
+    ) {
+        const isForEveryone =
+            Number(ModalButtonAnswers.DELETE_EVERYONE) === Number(forEveryone);
+
+        const messagesProperties = { delete_for: true };
+        const messagesDeleteFor = await this.getMessagesProperties(
+            ids,
+            messagesProperties,
+        );
+
+        await Promise.all(
+            messagesDeleteFor.map(async (msg, i) => {
+                await this.prisma.message.update({
+                    where: {
+                        id: Number(ids[i]),
+                        chat: {
+                            OR: [
+                                {
+                                    first_user: Number(userId),
+                                },
+                                {
+                                    second_user: Number(userId),
+                                },
+                            ],
+                        },
+                    },
+                    data: {
+                        deleted_at: new Date(),
+                        delete_for: isForEveryone
+                            ? [ModalButtonAnswers.DELETE_EVERYONE]
+                            : [...msg.delete_for, Number(userId)],
+                    },
+                });
+            }),
+        );
+    }
+
+    private async getMessagesProperties<T extends keyof Prisma.MessageSelect>(
+        ids: string[],
+        select: Record<T, boolean>,
+    ) {
+        return this.prisma.message.findMany({
+            where: {
+                id: {
+                    in: ids.map(Number),
+                },
+            },
+            select,
+        });
     }
 }

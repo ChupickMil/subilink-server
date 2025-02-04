@@ -82,6 +82,7 @@ model Chat {
   first_user  Int
   second_user Int
   created_at  DateTime @default(now()) @map("created_at")
+  deleteFor   String[]
 
   Message     Message[]
   user        User      @relation("FirstUser", fields: [first_user], references: [id])
@@ -113,6 +114,7 @@ model Message {
   deleted_at DateTime?
   send_at    DateTime  @default(now())
   created_at DateTime  @default(now()) @map("created_at")
+  delete_for Int[]
 
   files File[]
   user  User   @relation(fields: [sender_id], references: [id])
