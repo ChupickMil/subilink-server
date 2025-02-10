@@ -82,7 +82,8 @@ model Chat {
   first_user  Int
   second_user Int
   created_at  DateTime @default(now()) @map("created_at")
-  deleteFor   String[]
+  delete_for  Int[]
+  deleted_at  DateTime?
 
   Message     Message[]
   user        User      @relation("FirstUser", fields: [first_user], references: [id])

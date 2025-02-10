@@ -18,10 +18,10 @@ import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import * as fs from 'fs'
 import { memoryStorage } from 'multer'
+import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { MessageService } from './message.service'
-import { ModalButtonAnswers } from './types'
 
 @Controller('messages')
 export class MessageController {

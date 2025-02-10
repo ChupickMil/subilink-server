@@ -12,7 +12,6 @@ import { FriendService } from '../friend/friend.service'
 import { MessageService } from '../message/message.service'
 import { IChatMessageDto, IFriendsRequestDto } from './types'
 
-
 @Injectable()
 @WebSocketGateway({
     cors: {
@@ -63,9 +62,18 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             recipientId,
         );
 
+        const isDeletedChat = await this.chatService.getIsDeletedChat(userId, recipientId)
+
+        if(isDeletedChat){
+            await this.chatService.recoveryChat(userId, recipientId)
+        }
+
         if (!isHasChat) {
-            const isCreated = await this.chatService.createChat(userId, recipientId);
-            if(!isCreated) throw new Error('Failed to create chat')
+            const isCreated = await this.chatService.createChat(
+                userId,
+                recipientId,
+            );
+            if (!isCreated) throw new Error('Failed to create chat');
         }
 
         // Получаем ID чата
@@ -73,14 +81,14 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             await this.chatService.getChatId(userId, recipientId),
         );
 
-        if(!chatId) throw new Error("Chat not found")
+        if (!chatId) throw new Error('Chat not found');
 
         // Отправляем сообщение
         const result = await this.messageService.sendNewMessageChat(
             userId,
             chatId,
             content,
-            fileUuids
+            fileUuids,
         );
 
         // Уведомляем отправителя
@@ -186,6 +194,36 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('online-users', onlineUser);
     }
 
+    @SubscribeMessage('messages-list-invalidate')
+    async handleMessageListRefresh(
+        @MessageBody() dto: { userId: string; chatId: string }
+    ) {
+        const friendSocket = this.activeSockets.get(String(dto.chatId));
+
+        if (friendSocket) {
+            friendSocket.emit('messages-list-invalidate', {
+                friendId: dto.userId,
+            });
+        } else {
+            console.log(`Friend ${dto.chatId} is not connected`);
+        }
+    }
+
+    @SubscribeMessage('messages-user-list-invalidate')
+    async handleUserListRefresh(
+        @MessageBody() dto: { userId: string; chatId: string }
+    ) {
+        const friendSocket = this.activeSockets.get(String(dto.chatId));
+
+        if (friendSocket) {
+            friendSocket.emit('messages-user-list-invalidate', {
+                friendId: dto.userId,
+            });
+        } else {
+            console.log(`Friend ${dto.chatId} is not connected`);
+        }
+    }
+
     @SubscribeMessage('messages-read')
     async handleMessageRead(
         @MessageBody()
@@ -209,8 +247,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 { message_id: string; read_at: string; user_id: string }[]
             >,
         );
-
-        console.log(groupedMessages);
 
         for (const [friend_id, messages] of Object.entries(groupedMessages)) {
             const friendSocket = this.activeSockets.get(friend_id);

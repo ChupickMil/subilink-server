@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 import { Response } from 'express'
+import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { ChatService } from './chat.service'
@@ -25,7 +26,7 @@ export class ChatController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('chats')
-    async getFriends(@Req() req, @Query() query: { search: string }) {
+    async getChats(@Req() req, @Query() query: { search: string }) {
         const userId = req.session.passport.user;
         const search = query.search;
 
@@ -44,20 +45,31 @@ export class ChatController {
         const userId = req.session.passport.user;
         if (!userId) return res.status(HttpStatus.UNAUTHORIZED);
 
-        const chatId = query.chatId;
-        if (!chatId) return res.status(HttpStatus.BAD_REQUEST);
+        const recipientId = query.chatId;
+        if (!recipientId) return res.status(HttpStatus.BAD_REQUEST);
 
-        res.send(await this.chatService.getChatInfo(chatId));
+        res.send(await this.chatService.getChatInfo(recipientId));
     }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Delete('chats')
-    async deleteMessages(@Req() req, @Query() query: { ids: string }) {
+    async deleteMessages(@Req() req, @Query() query: { ids: string, for_everyone: ModalButtonAnswers }) {
         const userId = req.session.passport.user;
         const ids = query.ids.split(',');
+        const for_everyone = query.for_everyone
 
-        return await this.chatService.deleteChats(ids, userId);
+        return await this.chatService.deleteChats(ids, userId, for_everyone);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('unread-messages')
+    async getCountUnreadMessages(@Req() req, @Query() query: {chatId: string}){
+        const userId = req.session.passport.user;
+
+        return await this.chatService.getCountUnreadMessages(userId, query.chatId)
     }
 }

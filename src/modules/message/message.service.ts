@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import * as fs from 'fs/promises'
 import * as path from 'path'
+import { ModalButtonAnswers } from 'src/common/@types/types'
 import { ChatService } from '../chat/chat.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { ModalButtonAnswers } from './types'
 
 @Injectable()
 export class MessageService {
@@ -293,49 +293,50 @@ export class MessageService {
         const isForEveryone =
             Number(ModalButtonAnswers.DELETE_EVERYONE) === Number(forEveryone);
 
-        const messagesProperties = { delete_for: true };
-        const messagesDeleteFor = await this.getMessagesProperties(
-            ids,
-            messagesProperties,
-        );
+        const messagesDeleteFor = await this.getMessagesProperties(ids, {
+            delete_for: true,
+        });
 
-        await Promise.all(
-            messagesDeleteFor.map(async (msg, i) => {
-                await this.prisma.message.update({
-                    where: {
-                        id: Number(ids[i]),
-                        chat: {
-                            OR: [
-                                {
-                                    first_user: Number(userId),
-                                },
-                                {
-                                    second_user: Number(userId),
-                                },
-                            ],
-                        },
-                    },
-                    data: {
-                        deleted_at: new Date(),
-                        delete_for: isForEveryone
-                            ? [ModalButtonAnswers.DELETE_EVERYONE]
-                            : [...msg.delete_for, Number(userId)],
-                    },
-                });
-            }),
-        );
+        if (messagesDeleteFor.length === 0) return;
+
+        const userMessages = await this.prisma.message.findMany({
+            where: {
+                id: { in: ids.map(Number) },
+                chat: {
+                    OR: [
+                        { first_user: Number(userId) },
+                        { second_user: Number(userId) },
+                    ],
+                },
+            },
+            select: { id: true, delete_for: true },
+        });
+
+        const messageIds = userMessages.map((msg) => msg.id);
+
+        await this.prisma.message.updateMany({
+            where: { id: { in: messageIds } },
+            data: {
+                deleted_at: new Date(),
+                delete_for: isForEveryone
+                    ? [ModalButtonAnswers.DELETE_EVERYONE]
+                    : messagesDeleteFor
+                          .map((msg) =>
+                              msg.delete_for.includes(Number(userId))
+                                  ? msg.delete_for
+                                  : [...msg.delete_for, Number(userId)],
+                          )
+                          .flat(),
+            },
+        });
     }
 
     private async getMessagesProperties<T extends keyof Prisma.MessageSelect>(
-        ids: string[],
+        chat_ids: string[],
         select: Record<T, boolean>,
     ) {
         return this.prisma.message.findMany({
-            where: {
-                id: {
-                    in: ids.map(Number),
-                },
-            },
+            where: { chat_id: { in: chat_ids.map(Number) } },
             select,
         });
     }
