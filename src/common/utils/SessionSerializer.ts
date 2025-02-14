@@ -11,7 +11,7 @@ export class SessionSerializer extends PassportSerializer {
     }
 
     serializeUser(user: User, done: (err, user) => void) {
-        console.log('Serialize user ', user);
+        // console.log('Serialize user ', user);
         done(null, user.id);
     }
 

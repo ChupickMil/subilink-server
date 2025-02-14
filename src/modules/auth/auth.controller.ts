@@ -54,12 +54,15 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('check-code-phone')
     async checkCode(
-        @Res() res: Response,
+        @Req() req: Request,
+        @Res() res: Response & { req: { user: { id: number } } },
         @Body() { phone }: CheckCodeDto,
     ): Promise<Response> {
         const isUserReg = await this.authService.isUserReg(phone);
-
-        // console.log('Is user reg?: ' + isUserReg);
+        const user = res.req.user;
+        const sessionId = res.req.sessionID.split('.')[0];
+        const ip = req.ip;
+        const userAgent = req.headers['user-agent'];
 
         if (isUserReg) {
             const isTwoFAEnabled = await this.authService.isTwoFAEnabled(
@@ -74,6 +77,14 @@ export class AuthController {
                     isReg: true,
                 });
             } else {
+                if (user && user.id) {
+                    await this.authService.newVisit(
+                        user.id,
+                        sessionId,
+                        ip,
+                        userAgent,
+                    );
+                }
                 return res.status(HttpStatus.OK).json({
                     message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                     isTwoAuth: false,
@@ -81,6 +92,14 @@ export class AuthController {
                 });
             }
         } else {
+            if (user && user.id) {
+                await this.authService.newVisit(
+                    user.id,
+                    sessionId,
+                    ip,
+                    userAgent,
+                );
+            }
             return res.status(HttpStatus.OK).json({
                 message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                 isReg: false,
@@ -99,12 +118,26 @@ export class AuthController {
     @UseGuards(AuthenticatedGuard)
     @Post('authenticator-check')
     async validate2FA(
-        @Res() res: Response,
+        @Res() res: Response & { req: { user: { id: number } } },
         @Req() req: Request,
         @Body() { phone, code }: CheckCodeDto,
     ) {
+        const user = res.req.user;
+        const sessionId = res.req.sessionID.split('.')[0];
+        const ip = req.ip;
+        const userAgent = req.headers['user-agent'];
+
         const isValid = await this.authService.validate2FA(phone, code);
         if (isValid) {
+            if (user && user.id) {
+                await this.authService.newVisit(
+                    user.id,
+                    sessionId,
+                    ip,
+                    userAgent,
+                );
+            }
+    
             req.session.isTwoFAAuthenticated = true;
             return res.status(HttpStatus.OK).json({
                 success: true,
@@ -121,7 +154,7 @@ export class AuthController {
     async validateSession(@Res() res: Response, @Req() req) {
         const userId = req.session.passport.user;
 
-        await this.authService.updateLastVisit(userId)
+        await this.authService.updateLastVisit(userId);
         return res.status(HttpStatus.OK).json({
             success: true,
         });
@@ -130,7 +163,9 @@ export class AuthController {
     @Post('logout')
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     async logout(@Res() res: Response, @Req() req: Request) {
-        req.session.destroy((err) => {
+        const sessionId = res.req.sessionID.split('.')[0];
+
+        req.session.destroy(async (err) => {
             if (err) {
                 return res
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -138,6 +173,8 @@ export class AuthController {
             }
 
             res.clearCookie('SESSION_ID');
+
+            await this.authService.logout(sessionId)
 
             return res.status(HttpStatus.OK).json({ success: true });
         });

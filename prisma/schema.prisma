@@ -49,6 +49,7 @@ model User {
   followerFriends  Friend[]          @relation("FollowerRelation")
   chatFirstUser    Chat[]            @relation("FirstUser")
   chatSecondUser   Chat[]            @relation("SecondUser")
+  Visits           Visit[]
 
   @@map("user")
 }
@@ -78,10 +79,10 @@ model Setting {
 }
 
 model Chat {
-  id          Int      @id @unique @default(autoincrement())
+  id          Int       @id @unique @default(autoincrement())
   first_user  Int
   second_user Int
-  created_at  DateTime @default(now()) @map("created_at")
+  created_at  DateTime  @default(now()) @map("created_at")
   delete_for  Int[]
   deleted_at  DateTime?
 
@@ -165,4 +166,17 @@ model File {
   Message Message[]
 
   @@map("file")
+}
+
+model Visit {
+  id         Int     @id @unique @default(autoincrement())
+  user_id    Int
+  session_id String  @unique
+  ip_address String?
+  user_agent String?
+  is_active  Boolean
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("visit")
 }

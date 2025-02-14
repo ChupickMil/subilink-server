@@ -40,7 +40,33 @@ export class AuthService {
 
     async login(user: LoginUserDto) {}
 
-    async logout(sessionId: string) {}
+    async logout(sessionId: string) {
+        await this.prisma.visit.update({
+            where: {
+                session_id: sessionId
+            },
+            data: {
+                is_active: false
+            }
+        })
+    }
+
+    async newVisit(
+        id: number,
+        sessionId: string,
+        ip: string | undefined,
+        userAgent: string | undefined,
+    ) {
+        await this.prisma.visit.create({
+            data: {
+                user_id: id,
+                session_id: sessionId,
+                ip_address: ip ?? null,
+                user_agent: userAgent,
+                is_active: true,
+            },
+        });
+    }
 
     async isValidatedUser(phone: string, password: string) {
         const user = await this.userService.findUser(phone, 'phone');
@@ -254,11 +280,11 @@ export class AuthService {
     public async updateLastVisit(userId: string) {
         await this.prisma.user.update({
             where: {
-                id: Number(userId)
+                id: Number(userId),
             },
             data: {
-                last_visit: new Date()
-            }
-        })
+                last_visit: new Date(),
+            },
+        });
     }
 }
