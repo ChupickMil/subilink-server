@@ -171,10 +171,11 @@ model File {
 model Visit {
   id         Int     @id @unique @default(autoincrement())
   user_id    Int
-  session_id String  @unique
+  session_id String 
   ip_address String?
   user_agent String?
   is_active  Boolean
+  created_at  DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [user_id], references: [id])
 

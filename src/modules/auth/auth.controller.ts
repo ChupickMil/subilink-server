@@ -15,6 +15,7 @@ import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { AUTH } from 'src/common/messages'
+import { VisitService } from '../visit/visit.service'
 import { RateLimitGuard } from './../../common/guards/RateLimitGuard'
 import { AuthService } from './auth.service'
 import { CheckCodeDto } from './dto/CheckCode.dto'
@@ -23,7 +24,10 @@ import { VerificationPhoneDto } from './dto/VerificationPhone.dto'
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(
+        private readonly authService: AuthService,
+        private readonly visitService: VisitService,
+    ) {}
 
     @ApiResponse({ status: 201, type: VerificationPhoneDto })
     @UseGuards(RateLimitGuard)
@@ -78,7 +82,7 @@ export class AuthController {
                 });
             } else {
                 if (user && user.id) {
-                    await this.authService.newVisit(
+                    await this.visitService.newVisit(
                         user.id,
                         sessionId,
                         ip,
@@ -93,7 +97,7 @@ export class AuthController {
             }
         } else {
             if (user && user.id) {
-                await this.authService.newVisit(
+                await this.visitService.newVisit(
                     user.id,
                     sessionId,
                     ip,
@@ -129,15 +133,16 @@ export class AuthController {
 
         const isValid = await this.authService.validate2FA(phone, code);
         if (isValid) {
+            
             if (user && user.id) {
-                await this.authService.newVisit(
+                await this.visitService.newVisit(
                     user.id,
                     sessionId,
                     ip,
                     userAgent,
                 );
             }
-    
+
             req.session.isTwoFAAuthenticated = true;
             return res.status(HttpStatus.OK).json({
                 success: true,
@@ -174,7 +179,7 @@ export class AuthController {
 
             res.clearCookie('SESSION_ID');
 
-            await this.authService.logout(sessionId)
+            await this.authService.logoutBySessionId(sessionId);
 
             return res.status(HttpStatus.OK).json({ success: true });
         });

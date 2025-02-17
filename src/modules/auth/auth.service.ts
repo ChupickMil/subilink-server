@@ -40,32 +40,23 @@ export class AuthService {
 
     async login(user: LoginUserDto) {}
 
-    async logout(sessionId: string) {
-        await this.prisma.visit.update({
+    async logoutBySessionId(sessionId: string) {
+        const visit = await this.prisma.visit.findFirst({
             where: {
                 session_id: sessionId
+            }
+        })
+
+        if(!visit) return
+
+        await this.prisma.visit.update({
+            where: {
+                id: visit.id
             },
             data: {
                 is_active: false
             }
         })
-    }
-
-    async newVisit(
-        id: number,
-        sessionId: string,
-        ip: string | undefined,
-        userAgent: string | undefined,
-    ) {
-        await this.prisma.visit.create({
-            data: {
-                user_id: id,
-                session_id: sessionId,
-                ip_address: ip ?? null,
-                user_agent: userAgent,
-                is_active: true,
-            },
-        });
     }
 
     async isValidatedUser(phone: string, password: string) {
