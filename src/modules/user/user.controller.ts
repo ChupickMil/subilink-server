@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 
+import { Client, ClientKafka, Transport } from '@nestjs/microservices'
 import { Response } from 'express'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
@@ -21,6 +22,29 @@ import { UserService } from './user.service'
 
 @Controller('users')
 export class UserController {
+    @Client({
+        transport: Transport.KAFKA,
+        options: {
+            client: {
+                clientId: 'user',
+                brokers: ['localhost:9092']
+            },
+            consumer: {
+                groupId: 'user-service',
+            }
+        }
+    })
+    client: ClientKafka
+
+    async onModuleInit() {
+        this.client.subscribeToResponseOf('get.user');
+        this.client.subscribeToResponseOf('create.user');
+        this.client.subscribeToResponseOf('delete.user');
+        this.client.subscribeToResponseOf('get.global.users');
+
+        await this.client.connect()
+    }
+
     constructor(private readonly userService: UserService) {}
 
     @ApiResponse({ status: 200 })
@@ -28,6 +52,9 @@ export class UserController {
     @Get('user')
     async getUser(@Req() req) {
         const id = req.session.passport.user;
+
+        return this.client.send('get.user', id)
+
         return await this.userService.publicUser(id, 'id', true);
     }
 
