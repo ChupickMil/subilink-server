@@ -9,6 +9,7 @@ export class RedisService {
 
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        // @Inject("REDIS_SERVICE") private readonly redisService: ClientKafka,
         private readonly configService: ConfigService,
     ) {
         this.client = createClient({
@@ -17,8 +18,16 @@ export class RedisService {
         this.client.connect().catch(console.error);
     }
 
-    getClient(): RedisClientType {
+    //async onModuleInit() {
+    //     this.redisService.subscribeToResponseOf('get.redis.client')
+    //     this.redisService.subscribeToResponseOf('get.redis.client.reply');
+
+    //     await this.redisService.connect()
+    // }
+
+    async getClient(): Promise<RedisClientType> {
         return this.client;
+        // return await firstValueFrom(this.redisService.send('get.redis.client', {}))
     }
 
     async set(key: string, value: any, ttl: number): Promise<void> {

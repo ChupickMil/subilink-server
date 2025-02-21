@@ -26,7 +26,7 @@ async function bootstrap() {
     app.use(cookieParser());
 
     const redisService = app.get(RedisService);
-    const redisClient = redisService.getClient();
+    const redisClient = await redisService.getClient();
 
     app.use(
         session({

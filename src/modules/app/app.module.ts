@@ -9,8 +9,6 @@ import { MessageModule } from '../message/message.module'
 import { SocketModule } from '../socket/socket.module'
 import { UserModule } from '../user/user.module'
 import { VisitModule } from '../visit/visit.module'
-import { AppController } from './app.controller'
-import { AppService } from './app.service'
 
 @Module({
     imports: [
@@ -29,7 +27,5 @@ import { AppService } from './app.service'
             session: true,
         }),
     ],
-    controllers: [AppController],
-    providers: [AppService],
 })
 export class AppModule {}

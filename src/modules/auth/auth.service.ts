@@ -1,27 +1,46 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices'
 import * as bcrypt from 'bcrypt'
 import * as qrcode from 'qrcode'
+import { firstValueFrom } from 'rxjs'
 import * as speakeasy from 'speakeasy'
 import { AUTH } from 'src/common/messages'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
-import { UserService } from '../user/user.service'
 import { LoginUserDto, RegisterUserDto } from './dto'
+import { IUser } from './interfaces/IUser.interface'
 
 @Injectable()
 export class AuthService {
     constructor(
-        private readonly userService: UserService,
         private readonly redis: RedisService,
         private readonly prisma: PrismaService,
+        @Inject('USER_SERVICE') private readonly userClient: ClientKafka,
+        @Inject('VISIT_SERVICE') private readonly visitService: ClientKafka,
     ) {}
+
+    async onModuleInit() {
+        this.userClient.subscribeToResponseOf('create.user');
+        this.userClient.subscribeToResponseOf('find.user');
+        this.userClient.subscribeToResponseOf('get.name');
+        this.visitService.subscribeToResponseOf('new.visit')
+
+        await this.visitService.connect()
+        await this.userClient.connect();
+    }
 
     async register(user: RegisterUserDto) {
         try {
-            const isHaveUser = await this.userService.findUser(
-                user.phone,
-                'phone',
+            const isHaveUser = await firstValueFrom<boolean>(
+                this.userClient.send('find.user', {
+                    phone: user.phone,
+                    type: 'phone',
+                }),
             );
+            // const isHaveUser = await this.userService.findUser(
+            //     user.phone,
+            //     'phone',
+            // );
 
             if (isHaveUser) return { message: 'User already registered' };
 
@@ -30,7 +49,8 @@ export class AuthService {
                 name: user.name,
             };
 
-            await this.userService.createUser(newUser);
+            this.userClient.send('create.user', newUser);
+            // await this.userService.createUser(newUser);
 
             return { message: 'User is registered' };
         } catch (err) {
@@ -43,24 +63,29 @@ export class AuthService {
     async logoutBySessionId(sessionId: string) {
         const visit = await this.prisma.visit.findFirst({
             where: {
-                session_id: sessionId
-            }
-        })
+                session_id: sessionId,
+            },
+        });
 
-        if(!visit) return
+        if (!visit) return;
 
         await this.prisma.visit.update({
             where: {
-                id: visit.id
+                id: visit.id,
             },
             data: {
-                is_active: false
-            }
-        })
+                is_active: false,
+            },
+        });
     }
 
     async isValidatedUser(phone: string, password: string) {
-        const user = await this.userService.findUser(phone, 'phone');
+        const user = await firstValueFrom<IUser>(
+            this.userClient.send('find.user', {
+                phone,
+                type: 'phone',
+            }),
+        );
 
         if (!user) {
             return false;
@@ -70,11 +95,15 @@ export class AuthService {
     }
 
     public async isUserExist(phone: string): Promise<boolean> {
-        return !!(await this.userService.findUser(phone, 'phone'));
+        return !!(await firstValueFrom(
+            this.userClient.send('find.user', { phone, type: 'phone' }),
+        ));
     }
 
     public async isUserReg(phone: string): Promise<boolean> {
-        return !!(await this.userService.getName(phone));
+        return !!(await firstValueFrom(
+            this.userClient.send('get.name', { phone }),
+        ));
     }
 
     async sendVerificationCode(phone: string): Promise<void> {
@@ -105,6 +134,8 @@ export class AuthService {
     }
 
     async isValidateVerificationCode(phone: string, code: string) {
+        // console.log(phone);
+        // console.log(code);
         const res = await this.checkVerificationCode(phone, code);
 
         if (res.message === AUTH.ERROR.PHONE_CODE_CHECK) {
@@ -118,7 +149,10 @@ export class AuthService {
         });
 
         if (!user) {
-            const user = await this.userService.createUser({ phone });
+            const user = await firstValueFrom(
+                this.userClient.send('create.user', { phone }),
+            );
+            // const user = await this.userService.createUser({ phone });
             return user;
         }
 
@@ -277,5 +311,21 @@ export class AuthService {
                 last_visit: new Date(),
             },
         });
+    }
+
+    public async newVisit(
+        id: number,
+        sessionId: string,
+        ip: string | undefined,
+        userAgent: string | undefined,
+    ) {
+        return await firstValueFrom(
+            this.visitService.emit('new.visit', {
+                id,
+                sessionId,
+                ip,
+                userAgent,
+            }),
+        );
     }
 }

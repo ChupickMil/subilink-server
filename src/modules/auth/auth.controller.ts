@@ -7,7 +7,7 @@ import {
     Post,
     Req,
     Res,
-    UseGuards,
+    UseGuards
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 import { Request, Response } from 'express'
@@ -15,7 +15,6 @@ import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { LocalAuthGuard } from 'src/common/guards/LocalAuthGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { AUTH } from 'src/common/messages'
-import { VisitService } from '../visit/visit.service'
 import { RateLimitGuard } from './../../common/guards/RateLimitGuard'
 import { AuthService } from './auth.service'
 import { CheckCodeDto } from './dto/CheckCode.dto'
@@ -26,7 +25,6 @@ import { VerificationPhoneDto } from './dto/VerificationPhone.dto'
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
-        private readonly visitService: VisitService,
     ) {}
 
     @ApiResponse({ status: 201, type: VerificationPhoneDto })
@@ -82,7 +80,7 @@ export class AuthController {
                 });
             } else {
                 if (user && user.id) {
-                    await this.visitService.newVisit(
+                    await this.authService.newVisit(
                         user.id,
                         sessionId,
                         ip,
@@ -97,7 +95,7 @@ export class AuthController {
             }
         } else {
             if (user && user.id) {
-                await this.visitService.newVisit(
+                await this.authService.newVisit(
                     user.id,
                     sessionId,
                     ip,
@@ -135,7 +133,7 @@ export class AuthController {
         if (isValid) {
             
             if (user && user.id) {
-                await this.visitService.newVisit(
+                await this.authService.newVisit(
                     user.id,
                     sessionId,
                     ip,

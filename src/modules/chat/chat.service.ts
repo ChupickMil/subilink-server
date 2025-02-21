@@ -1,16 +1,23 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import { Prisma } from '@prisma/client'
+import { firstValueFrom } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { PrismaService } from '../prisma/prisma.service'
-import { UserService } from '../user/user.service'
 import { ChatWithRelations, IFilteredChat } from './types'
 
 @Injectable()
 export class ChatService {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly userService: UserService,
+        @Inject('USER_SERVICE') private readonly userClient: ClientKafka,
     ) {}
+
+    async onModuleInit() {
+        this.userClient.subscribeToResponseOf('get.public.user')
+
+        await this.userClient.connect()
+    }
 
     public async getChat(userId: string, recipientId: string) {
         return await this.prisma.chat.findFirst({
@@ -292,12 +299,13 @@ export class ChatService {
 
     public async getChatInfo(recipientId: string) {
         // id собеседника
-        console.log('recipientId ' + recipientId);
-        const user = await this.userService.publicUser(
-            recipientId,
-            'id',
-            false,
-            true,
+        const user = await firstValueFrom(
+            this.userClient.send('get.public.user', {
+                value: recipientId,
+                type: 'id',
+                isPhone: false,
+                isLastVisit: true,
+            }),
         );
         return user;
     }

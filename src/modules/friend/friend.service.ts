@@ -1,14 +1,21 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import { FriendStatuses } from '@prisma/client'
+import { firstValueFrom } from 'rxjs'
 import { PrismaService } from '../prisma/prisma.service'
-import { UserService } from '../user/user.service'
 
 @Injectable()
 export class FriendService {
     constructor(
-        private readonly userService: UserService,
         private readonly prisma: PrismaService,
+        @Inject('USER_SERVICE') private readonly userClient: ClientKafka,
     ) {}
+
+    async onModuleInit() {
+        this.userClient.subscribeToResponseOf('get.public.user');
+
+        await this.userClient.connect();
+    }
 
     async getFriends(id: string, search: string) {
         const friendsFromDb = await this.prisma.friend.findMany({
@@ -37,16 +44,27 @@ export class FriendService {
     async searchUsers(friendIds: number[], search: string) {
         if (!search) {
             return await Promise.all(
-                friendIds.map(
-                    async (id) =>
-                        await this.userService.publicUser(id, 'id', false),
-                ),
+                friendIds.map(async (id) => {
+                    return await firstValueFrom(
+                        this.userClient.send('get.public.user', {
+                            value: id,
+                            type: 'id',
+                            isPhone: false,
+                        }),
+                    );
+                }),
             );
         }
 
         return await Promise.all(
             friendIds.map(async (id) => {
-                const user = await this.userService.publicUser(id, 'id', false);
+                const user = await firstValueFrom(
+                    this.userClient.send('get.public.user', {
+                        value: id,
+                        type: 'id',
+                        isPhone: false,
+                    }),
+                );
                 if (
                     user?.name &&
                     user.name.toLowerCase().includes(search.toLowerCase())
@@ -65,9 +83,6 @@ export class FriendService {
                 followed_id: Number(friendId),
             },
         });
-        console.log(userId)
-        console.log(friendId)
-        console.log(isExist)
         if (isExist) return;
 
         await this.prisma.friend.create({

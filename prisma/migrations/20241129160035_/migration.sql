@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "friend" ALTER COLUMN "created_at" SET DEFAULT CURRENT_TIMESTAMP,
-ALTER COLUMN "status" SET DEFAULT 'pending';

@@ -1,12 +1,32 @@
-import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common'
+import {
+    Controller,
+    Get,
+    Inject,
+    Query,
+    Req,
+    Res,
+    UseGuards,
+} from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices'
 import { ApiResponse } from '@nestjs/swagger'
+import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
-import { VisitService } from './visit.service'
 
 @Controller('visits')
 export class VisitController {
-    constructor(private readonly visitService: VisitService) {}
+    constructor(
+        @Inject('VISIT_SERVICE') private readonly client: ClientKafka,
+    ) {
+        this.client.subscribeToResponseOf('get.visits');
+        this.client.subscribeToResponseOf('logout.by.id');
+        this.client.subscribeToResponseOf('get.date.visits');
+        this.client.subscribeToResponseOf('new.visit');
+    }
+    
+    async onModuleInit() {
+        await this.client.connect();
+    }
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
@@ -15,7 +35,9 @@ export class VisitController {
         const userId = req.session.passport.user;
         const sessionId = req.sessionID.split('.')[0];
 
-        return await this.visitService.getVisits(sessionId, userId);
+        return await firstValueFrom(
+            this.client.send('get.visits', { sessionId, userId }),
+        );
     }
 
     @ApiResponse({ status: 200 })
@@ -23,7 +45,12 @@ export class VisitController {
     @Get('logout')
     async logoutVisit(@Req() req, @Query() query: { id: string }) {
         const userId = req.session.passport.user;
-        return await this.visitService.logoutById(query.id, userId);
+        return await firstValueFrom(
+            this.client.emit('logout.by.id', {
+                id: query.id,
+                userId,
+            }),
+        );
     }
 
     @ApiResponse({ status: 200 })
@@ -31,7 +58,9 @@ export class VisitController {
     @Get('date-visits')
     async getDateVisits(@Req() req) {
         const userId = req.session.passport.user;
-        return await this.visitService.getDateVisits(userId);
+        return await firstValueFrom(
+            this.client.send('get.date.visits', { userId }),
+        );
     }
 
     @ApiResponse({ status: 200 })
@@ -43,7 +72,14 @@ export class VisitController {
         const ip = req.ip;
         const userAgent = req.headers['user-agent'];
 
-        await this.visitService.newVisit(userId, sessionId, ip, userAgent);
+        await firstValueFrom(
+            this.client.send('new.visit', {
+                userId,
+                sessionId,
+                ip,
+                userAgent,
+            }),
+        );
         return true;
     }
 }
