@@ -17,16 +17,7 @@ import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 export class VisitController {
     constructor(
         @Inject('VISIT_SERVICE') private readonly client: ClientKafka,
-    ) {
-        this.client.subscribeToResponseOf('get.visits');
-        this.client.subscribeToResponseOf('logout.by.id');
-        this.client.subscribeToResponseOf('get.date.visits');
-        this.client.subscribeToResponseOf('new.visit');
-    }
-    
-    async onModuleInit() {
-        await this.client.connect();
-    }
+    ) {}
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)

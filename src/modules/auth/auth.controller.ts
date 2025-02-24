@@ -23,9 +23,7 @@ import { VerificationPhoneDto } from './dto/VerificationPhone.dto'
 
 @Controller('auth')
 export class AuthController {
-    constructor(
-        private readonly authService: AuthService,
-    ) {}
+    constructor(private readonly authService: AuthService) {}
 
     @ApiResponse({ status: 201, type: VerificationPhoneDto })
     @UseGuards(RateLimitGuard)
@@ -131,7 +129,6 @@ export class AuthController {
 
         const isValid = await this.authService.validate2FA(phone, code);
         if (isValid) {
-            
             if (user && user.id) {
                 await this.authService.newVisit(
                     user.id,

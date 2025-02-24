@@ -11,24 +11,26 @@ import {
     Res,
     UploadedFiles,
     UseGuards,
-    UseInterceptors,
+    UseInterceptors
 } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import * as fs from 'fs'
 import { memoryStorage } from 'multer'
+import { firstValueFrom } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
-import { MessageService } from './message.service'
+import { KafkaService } from '../kafka/kafka.service'
 
 @Controller('messages')
 export class MessageController {
-    constructor(
-        private readonly messagesService: MessageService,
-        private readonly configService: ConfigService,
-    ) {}
+    private messagesClient: ClientKafka
+
+    constructor(private readonly kafkaService: KafkaService) {
+        this.messagesClient = this.kafkaService.getMessageClient()
+    }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
@@ -41,7 +43,15 @@ export class MessageController {
         const userId = req.session.passport.user;
         const senderId = query.senderId;
         const param = query.param;
-        return await this.messagesService.getPublicMessages(userId, senderId, param);
+
+        return await firstValueFrom(
+            this.messagesClient.send('get.messages', {
+                userId,
+                senderId,
+                param,
+            }),
+        );
+        // return await this.messagesService.getPublicMessages(userId, senderId, param);
     }
 
     @ApiResponse({ status: 201 })
@@ -50,13 +60,20 @@ export class MessageController {
     @Delete('messages')
     async deleteMessages(
         @Req() req,
-        @Query() query: { ids: string, for_everyone: ModalButtonAnswers },
+        @Query() query: { ids: string; for_everyone: ModalButtonAnswers },
     ) {
         const userId = req.session.passport.user;
-        const ids = query.ids.split(',')
-        const forEveryone = query.for_everyone
+        const ids = query.ids.split(',');
+        const forEveryone = query.for_everyone;
 
-        return await this.messagesService.deleteMessages(ids, forEveryone, userId);
+        return await firstValueFrom(
+            this.messagesClient.send('delete.messages', {
+                ids,
+                forEveryone,
+                userId,
+            }),
+        );
+        // return await this.messagesService.deleteMessages(ids, forEveryone, userId);
     }
 
     @ApiResponse({ status: 201 })
@@ -70,12 +87,20 @@ export class MessageController {
         const userId = req.session.passport.user;
         const senderId = query.senderId;
         const search = query.search;
-        return await this.messagesService.getPublicMessages(
-            userId,
-            senderId,
-            null,
-            search,
+
+        await firstValueFrom(
+            this.messagesClient.send('get.messages.search', {
+                userId,
+                senderId,
+                search,
+            }),
         );
+        // return await this.messagesService.getPublicMessages(
+        //     userId,
+        //     senderId,
+        //     null,
+        //     search,
+        // );
     }
 
     @ApiResponse({ status: 201 })
@@ -90,10 +115,17 @@ export class MessageController {
     @Post('save-file')
     async sendFile(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
         const userId = req.session.passport.user;
-        const uuids = req.body.uuid;
+        const uuids = req.body.uuid as string | string[];
         const uuidsArray = Array.isArray(uuids) ? uuids : [uuids];
 
-        await this.messagesService.saveFile(userId, files, uuidsArray);
+        await firstValueFrom(
+            this.messagesClient.send('save.messages.file', {
+                userId,
+                files,
+                uuidsArray,
+            }),
+        );
+        // await this.messagesService.saveFile(userId, files, uuidsArray);
     }
 
     // @ApiResponse({ status: 201, type: FriendsDto })
@@ -145,9 +177,15 @@ export class MessageController {
     async getImage(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
 
-        if(!userId) return
+        if (!userId) return;
 
-        const data = await this.messagesService.getImage(uuid, userId);
+        const data = await firstValueFrom(
+            this.messagesClient.send('get.messages.image', {
+                uuid,
+                userId,
+            }),
+        );
+        // const data = await this.messagesService.getImage(uuid, userId);
 
         if (!data) return;
         res.setHeader('Content-Type', data.mime_type);
@@ -165,20 +203,29 @@ export class MessageController {
     @Get('file/:uuid')
     async downloadFile(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
-    
+
         if (!userId) return res.status(403).send('Unauthorized');
-    
-        const data = await this.messagesService.downloadFile(uuid, userId);
+
+        const data = await firstValueFrom(
+            this.messagesClient.send('get.messages.file', {
+                uuid,
+                userId,
+            }),
+        );
+        // const data = await this.messagesService.downloadFile(uuid, userId);
 
         if (!data) return res.status(404).send('File not found');
-    
+
         const filePath = data.path;
         const fileName = data.original_name;
         const mimeType = data.mime_type || 'application/octet-stream';
-    
+
         res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-        
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${encodeURIComponent(fileName)}"`,
+        );
+
         const fileStat = fs.statSync(filePath);
         res.setHeader('Content-Length', fileStat.size);
 

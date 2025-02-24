@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import {
     ConnectedSocket,
     MessageBody,
@@ -7,9 +8,8 @@ import {
     SubscribeMessage,
     WebSocketGateway,
 } from '@nestjs/websockets'
-import { ChatService } from '../chat/chat.service'
-import { FriendService } from '../friend/friend.service'
-import { MessageService } from '../message/message.service'
+import { firstValueFrom } from 'rxjs'
+import { KafkaService } from '../kafka/kafka.service'
 import { IChatMessageDto, IFriendsRequestDto } from './types'
 
 @Injectable()
@@ -21,11 +21,16 @@ import { IChatMessageDto, IFriendsRequestDto } from './types'
     },
 })
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
-    constructor(
-        private readonly friendService: FriendService,
-        private readonly chatService: ChatService,
-        private readonly messageService: MessageService,
-    ) {}
+    private friendClient: ClientKafka;
+    private chatClient: ClientKafka;
+    private messageClient: ClientKafka;
+
+    constructor(private readonly kafkaService: KafkaService) {
+        this.friendClient = this.kafkaService.getFriendClient();
+        this.chatClient = this.kafkaService.getChatClient();
+        this.messageClient = this.kafkaService.getMessageClient();
+    }
+
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
 
     handleConnection(client: any) {
@@ -57,39 +62,60 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const { userId, recipientId, content, fileUuids } = dto;
 
         // Проверяем существование чата или создаем новый
-        const isHasChat = await this.chatService.getIsHasChat(
-            userId,
-            recipientId,
+        const isHasChat = await firstValueFrom(
+            this.chatClient.send('get.is.has.chat', {
+                userId,
+                recipientId,
+            }),
         );
 
-        const isDeletedChat = await this.chatService.getIsDeletedChat(userId, recipientId)
+        const isDeletedChat = await firstValueFrom(
+            this.chatClient.send('get.is.deleted.chat', {
+                userId,
+                recipientId,
+            }),
+        );
 
-        if(isDeletedChat){
-            await this.chatService.recoveryChat(userId, recipientId)
+        if (isDeletedChat) {
+            await firstValueFrom(
+                this.chatClient.send('recovery.chat', { userId, recipientId }),
+            );
         }
 
         if (!isHasChat) {
-            const isCreated = await this.chatService.createChat(
-                userId,
-                recipientId,
+            const isCreated = await firstValueFrom(
+                this.chatClient.send('create.chat', { userId, recipientId }),
             );
             if (!isCreated) throw new Error('Failed to create chat');
         }
 
         // Получаем ID чата
         const chatId = String(
-            await this.chatService.getChatId(userId, recipientId),
+            await firstValueFrom(
+                this.chatClient.send('get.chat.id', {
+                    userId,
+                    recipientId,
+                }),
+            ),
         );
 
         if (!chatId) throw new Error('Chat not found');
 
         // Отправляем сообщение
-        const result = await this.messageService.sendNewMessageChat(
-            userId,
-            chatId,
-            content,
-            fileUuids,
+        const result = await firstValueFrom(
+            this.messageClient.send('send.new.message', {
+                userId,
+                chatId,
+                content,
+                fileUuids,
+            }),
         );
+        // const result = await this.messageService.sendNewMessageChat(
+        //     userId,
+        //     chatId,
+        //     content,
+        //     fileUuids,
+        // );
 
         // Уведомляем отправителя
         client.emit('messages', { ...result, userId, recipientId });
@@ -128,8 +154,12 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         // записываем в бд
-        await this.friendService.addFriend(dto.userId, dto.friendId);
-
+        await firstValueFrom(
+            this.friendClient.send('add.friend', {
+                userId: dto.userId,
+                friendId: dto.friendId,
+            }),
+        );
         // Подтверждаем действие инициатору
         client.emit('friends-request', { success: true });
     }
@@ -153,7 +183,12 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         // обновляем бд
-        await this.friendService.acceptRequest(dto.userId, dto.friendId);
+        await firstValueFrom(
+            this.friendClient.send('accept.request', {
+                userId: dto.userId,
+                friendId: dto.friendId,
+            }),
+        );
 
         // Подтверждаем действие инициатору
         client.emit('friends-accept-request', { success: true });
@@ -165,9 +200,11 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await this.friendService.cancelOutgoingRequest(
-            dto.userId,
-            dto.friendId,
+        await firstValueFrom(
+            this.friendClient.send('cancel.outgoing.request', {
+                userId: dto.userId,
+                friendId: dto.friendId,
+            }),
         );
 
         // Подтверждаем действие инициатору
@@ -196,7 +233,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('messages-list-invalidate')
     async handleMessageListRefresh(
-        @MessageBody() dto: { userId: string; chatId: string }
+        @MessageBody() dto: { userId: string; chatId: string },
     ) {
         const friendSocket = this.activeSockets.get(String(dto.chatId));
 
@@ -211,7 +248,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('messages-user-list-invalidate')
     async handleUserListRefresh(
-        @MessageBody() dto: { userId: string; chatId: string }
+        @MessageBody() dto: { userId: string; chatId: string },
     ) {
         const friendSocket = this.activeSockets.get(String(dto.chatId));
 
@@ -266,8 +303,9 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             });
         }
 
-        await this.messageService.updateMessageRead(dto);
-
-        // client.emit('online-users', onlineUser);
+        await firstValueFrom(
+            this.messageClient.send('update.message.status', dto),
+        );
+        // await this.messageService.updateMessageRead(dto);
     }
 }

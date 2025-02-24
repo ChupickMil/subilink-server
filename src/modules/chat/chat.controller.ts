@@ -7,20 +7,28 @@ import {
     Query,
     Req,
     Res,
-    UseGuards,
+    UseGuards
 } from '@nestjs/common'
+import { ClientKafka } from '@nestjs/microservices'
 import { ApiResponse } from '@nestjs/swagger'
 import { Response } from 'express'
+import { firstValueFrom } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
-import { ChatService } from './chat.service'
+import { KafkaService } from '../kafka/kafka.service'
 import { ChatInfoDto } from './dto/ChatInfo.dto'
 import { FilteredChatDto } from './dto/FilteredChat.dto'
 
 @Controller('chats')
 export class ChatController {
-    constructor(private readonly chatService: ChatService) {}
+    private chatClient: ClientKafka
+
+    constructor(
+        private readonly kafkaService: KafkaService
+    ) {
+        this.chatClient = this.kafkaService.getChatClient()
+    }
 
     @ApiResponse({ status: 200, type: FilteredChatDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
@@ -30,7 +38,9 @@ export class ChatController {
         const userId = req.session.passport.user;
         const search = query.search;
 
-        return await this.chatService.getChats(userId, search);
+        return await firstValueFrom(
+            this.chatClient.send('get.chats', { userId, search }),
+        );
     }
 
     @ApiResponse({ status: 200, type: ChatInfoDto })
@@ -48,28 +58,44 @@ export class ChatController {
         const recipientId = query.chatId;
         if (!recipientId) return res.status(HttpStatus.BAD_REQUEST);
 
-        res.send(await this.chatService.getChatInfo(recipientId));
+        const result = await firstValueFrom(
+            this.chatClient.send('get.chat.info', { recipientId }),
+        );
+        res.send(result);
     }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Delete('chats')
-    async deleteMessages(@Req() req, @Query() query: { ids: string, for_everyone: ModalButtonAnswers }) {
+    async deleteMessages(
+        @Req() req,
+        @Query() query: { ids: string; for_everyone: ModalButtonAnswers },
+    ) {
         const userId = req.session.passport.user;
         const ids = query.ids.split(',');
-        const for_everyone = query.for_everyone
+        const for_everyone = query.for_everyone;
 
-        return await this.chatService.deleteChats(ids, userId, for_everyone);
+        await firstValueFrom(
+            this.chatClient.emit('delete.chats', { ids, userId, for_everyone }),
+        );
     }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Get('unread-messages')
-    async getCountUnreadMessages(@Req() req, @Query() query: {chatId: string}){
+    @Get('count-unread-messages')
+    async getCountUnreadMessages(
+        @Req() req,
+        @Query() query: { chatId: string },
+    ) {
         const userId = req.session.passport.user;
 
-        return await this.chatService.getCountUnreadMessages(userId, query.chatId)
+        return await firstValueFrom(
+            this.chatClient.send('get.count.unread.messages', {
+                userId,
+                recipientId: query.chatId,
+            }),
+        );
     }
 }

@@ -1,12 +1,14 @@
+import { AuthModule } from '@auth/auth.module'
 import { Module } from '@nestjs/common'
-import { ChatModule } from '../chat/chat.module'
-import { FriendModule } from '../friend/friend.module'
-import { MessageModule } from '../message/message.module'
+import { KafkaModule } from '../kafka/kafka.module'
 import { SocketService } from './socket.service'
 
 @Module({
-  imports: [FriendModule, ChatModule, MessageModule],
-  providers: [SocketService],
-  exports: [SocketService]
+    imports: [
+        AuthModule,
+        KafkaModule
+    ],
+    providers: [SocketService],
+    exports: [SocketService],
 })
 export class SocketModule {}

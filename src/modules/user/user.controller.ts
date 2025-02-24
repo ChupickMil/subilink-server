@@ -3,13 +3,12 @@ import {
     Controller,
     Get,
     HttpStatus,
-    Inject,
     Patch,
     Query,
     Req,
     Res,
     Session,
-    UseGuards,
+    UseGuards
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 
@@ -18,20 +17,16 @@ import { Response } from 'express'
 import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { KafkaService } from '../kafka/kafka.service'
 import { UpdateUserDto } from './dto'
 import { GlobalUsers } from './dto/globalUser.dto'
 
 @Controller('users')
 export class UserController {
-    constructor(@Inject("USER_SERVICE") private readonly client: ClientKafka) {
-        this.client.subscribeToResponseOf('get.user');
-        this.client.subscribeToResponseOf('delete.user');
-        this.client.subscribeToResponseOf('get.global.users');
-        this.client.subscribeToResponseOf('update.user');
-    }
+    private userClient: ClientKafka
 
-    async onModuleInit() {
-        await this.client.connect();
+    constructor(private readonly kafkaService: KafkaService) {
+        this.userClient = kafkaService.getUserClient()
     }
 
     @ApiResponse({ status: 200 })
@@ -40,7 +35,7 @@ export class UserController {
     async getUser(@Req() req) {
         const id = req.session.passport.user;
 
-        return this.client.send('get.user', id);
+        return await firstValueFrom(this.userClient.send('get.user', id));
     }
 
     @ApiResponse({ status: 200, type: UpdateUserDto })
@@ -52,7 +47,7 @@ export class UserController {
         @Res() res: Response,
     ) {
         const answer = await firstValueFrom<{ isSuccess: boolean }>(
-            this.client.send('update.user', user),
+            this.userClient.send('update.user', user),
         );
         return answer.isSuccess
             ? res.status(HttpStatus.OK).json({ success: true })
@@ -65,6 +60,6 @@ export class UserController {
     async getGlobalUsers(@Req() req, @Query() query: { search: string }) {
         const userId = req.session.passport.user;
         const search = query.search;
-        return this.client.send('get.global.users', { userId, search });
+        return this.userClient.send('get.global.users', { userId, search });
     }
 }

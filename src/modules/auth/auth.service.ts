@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices'
 import * as bcrypt from 'bcrypt'
 import * as qrcode from 'qrcode'
 import { firstValueFrom } from 'rxjs'
 import * as speakeasy from 'speakeasy'
 import { AUTH } from 'src/common/messages'
+import { KafkaService } from '../kafka/kafka.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { LoginUserDto, RegisterUserDto } from './dto'
@@ -12,23 +13,18 @@ import { IUser } from './interfaces/IUser.interface'
 
 @Injectable()
 export class AuthService {
+    private userClient: ClientKafka
+    private visitClient: ClientKafka
+
     constructor(
         private readonly redis: RedisService,
         private readonly prisma: PrismaService,
-        @Inject('USER_SERVICE') private readonly userClient: ClientKafka,
-        @Inject('VISIT_SERVICE') private readonly visitService: ClientKafka,
-    ) {}
-
-    async onModuleInit() {
-        this.userClient.subscribeToResponseOf('create.user');
-        this.userClient.subscribeToResponseOf('find.user');
-        this.userClient.subscribeToResponseOf('get.name');
-        this.visitService.subscribeToResponseOf('new.visit')
-
-        await this.visitService.connect()
-        await this.userClient.connect();
+        private readonly kafkaService: KafkaService,
+    ) {
+        this.userClient = this.kafkaService.getUserClient()
+        this.visitClient = this.kafkaService.getVisitClient()
     }
-
+   
     async register(user: RegisterUserDto) {
         try {
             const isHaveUser = await firstValueFrom<boolean>(
@@ -96,7 +92,7 @@ export class AuthService {
 
     public async isUserExist(phone: string): Promise<boolean> {
         return !!(await firstValueFrom(
-            this.userClient.send('find.user', { phone, type: 'phone' }),
+            this.userClient.send("find.user", { phone, type: 'phone' }),
         ));
     }
 
@@ -320,7 +316,7 @@ export class AuthService {
         userAgent: string | undefined,
     ) {
         return await firstValueFrom(
-            this.visitService.emit('new.visit', {
+            this.visitClient.emit('new.visit', {
                 id,
                 sessionId,
                 ip,
