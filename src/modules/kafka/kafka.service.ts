@@ -31,6 +31,8 @@ export class KafkaService {
         this.messageClient.subscribeToResponseOf('get.messages.search');
         this.messageClient.subscribeToResponseOf('save.messages.file');
         this.messageClient.subscribeToResponseOf('get.messages.image');
+        this.messageClient.subscribeToResponseOf('send.new.message');
+        this.messageClient.subscribeToResponseOf('update.message.status');
 
         this.chatClient.subscribeToResponseOf('get.chats');
         this.chatClient.subscribeToResponseOf('get.chat.info');

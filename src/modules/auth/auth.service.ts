@@ -299,14 +299,7 @@ export class AuthService {
     }
 
     public async updateLastVisit(userId: string) {
-        await this.prisma.user.update({
-            where: {
-                id: Number(userId),
-            },
-            data: {
-                last_visit: new Date(),
-            },
-        });
+        this.visitClient.emit("update.last.visit", { userId })
     }
 
     public async newVisit(

@@ -62,19 +62,19 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const { userId, recipientId, content, fileUuids } = dto;
 
         // Проверяем существование чата или создаем новый
-        const isHasChat = await firstValueFrom(
+        const isHasChat = JSON.parse(await firstValueFrom(
             this.chatClient.send('get.is.has.chat', {
                 userId,
                 recipientId,
             }),
-        );
+        ));
 
-        const isDeletedChat = await firstValueFrom(
+        const isDeletedChat = JSON.parse(await firstValueFrom(
             this.chatClient.send('get.is.deleted.chat', {
                 userId,
                 recipientId,
             }),
-        );
+        ));
 
         if (isDeletedChat) {
             await firstValueFrom(
@@ -83,6 +83,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         if (!isHasChat) {
+            console.log(123)
             const isCreated = await firstValueFrom(
                 this.chatClient.send('create.chat', { userId, recipientId }),
             );
@@ -98,6 +99,9 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 }),
             ),
         );
+
+        console.log('chatid')
+        console.log(chatId)
 
         if (!chatId) throw new Error('Chat not found');
 

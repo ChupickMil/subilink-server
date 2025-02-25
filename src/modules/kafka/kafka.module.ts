@@ -51,7 +51,7 @@ import { KafkaService } from './kafka.service'
                         brokers: ['localhost:9092'],
                     },
                     consumer: {
-                        groupId: 'friend_service',
+                        groupId: 'friend-service',
                     },
                 },
             },
