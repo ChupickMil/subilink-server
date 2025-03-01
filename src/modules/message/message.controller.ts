@@ -11,14 +11,16 @@ import {
     Res,
     UploadedFiles,
     UseGuards,
-    UseInterceptors
+    UseInterceptors,
 } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import * as fs from 'fs'
+import * as fsPromise from 'fs/promises'
 import { memoryStorage } from 'multer'
-import { firstValueFrom } from 'rxjs'
+import * as path from 'path'
+import { firstValueFrom, timeout } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
@@ -26,10 +28,10 @@ import { KafkaService } from '../kafka/kafka.service'
 
 @Controller('messages')
 export class MessageController {
-    private messagesClient: ClientKafka
+    private messagesClient: ClientKafka;
 
     constructor(private readonly kafkaService: KafkaService) {
-        this.messagesClient = this.kafkaService.getMessageClient()
+        this.messagesClient = this.kafkaService.getMessageClient();
     }
 
     @ApiResponse({ status: 201 })
@@ -67,13 +69,14 @@ export class MessageController {
         const forEveryone = query.for_everyone;
 
         return await firstValueFrom(
-            this.messagesClient.send('delete.messages', {
-                ids,
-                forEveryone,
-                userId,
-            }),
+            this.messagesClient
+                .send('delete.messages', {
+                    ids,
+                    forEveryone,
+                    userId,
+                })
+                .pipe(timeout(2000)),
         );
-        // return await this.messagesService.deleteMessages(ids, forEveryone, userId);
     }
 
     @ApiResponse({ status: 201 })
@@ -88,19 +91,13 @@ export class MessageController {
         const senderId = query.senderId;
         const search = query.search;
 
-        await firstValueFrom(
+        return await firstValueFrom(
             this.messagesClient.send('get.messages.search', {
                 userId,
                 senderId,
                 search,
             }),
         );
-        // return await this.messagesService.getPublicMessages(
-        //     userId,
-        //     senderId,
-        //     null,
-        //     search,
-        // );
     }
 
     @ApiResponse({ status: 201 })
@@ -117,58 +114,47 @@ export class MessageController {
         const userId = req.session.passport.user;
         const uuids = req.body.uuid as string | string[];
         const uuidsArray = Array.isArray(uuids) ? uuids : [uuids];
+        const userDir = path.join('uploads', String(userId));
+
+        try {
+            await fsPromise.access(userDir).catch(async () => {
+                await fsPromise.mkdir(userDir, { recursive: true });
+            });
+        } catch (err) {
+            throw new Error('Failed to create directory for user files');
+        }
+
+        const filesToDb = await Promise.all(files.map(async (file, i) => {
+            const typeParts = file.originalname.split('.');
+            const typeFile = '.' + typeParts[typeParts.length - 1];
+
+            const originalName = Buffer.from(
+                file.originalname,
+                'latin1',
+            ).toString('utf8');
+
+            const filePath = path.join(userDir, uuidsArray[i] + typeFile);
+
+            const fullPath = path.join(process.cwd(), filePath);
+            await fsPromise.writeFile(fullPath, Buffer.from(file.buffer));
+
+            return {
+                uuid: uuidsArray[i],
+                path: fullPath,
+                type: typeFile,
+                size: file.size,
+                mime_type: file.mimetype,
+                original_name: originalName,
+                user_id: Number(userId),
+            };
+        }));
 
         await firstValueFrom(
             this.messagesClient.send('save.messages.file', {
-                userId,
-                files,
-                uuidsArray,
+                filesToDb
             }),
         );
-        // await this.messagesService.saveFile(userId, files, uuidsArray);
     }
-
-    // @ApiResponse({ status: 201, type: FriendsDto })
-    // @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    // @HttpCode(HttpStatus.OK)
-    // @Get('get-updated-last-message')
-    // async getUpdatedLastMessage(@Req() req, @Query() query) {
-    //     const userId = req.session.passport.user;
-    //     const senderId = query.senderId;
-    //     return await this.messagesService.getUpdatedLastMessage(
-    //         userId,
-    //         senderId,
-    //     );
-    // }
-
-    // image
-    // @ApiResponse({ status: 201 })
-    // @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    // @HttpCode(HttpStatus.OK)
-    // @Get('image/:name')
-    // async serveImage(@Res() res, @Req() req, @Param('name') name: string) {
-    //     const userId = 4;
-    //     const filePath = path.join(
-    //         process.cwd(),
-    //         'uploads',
-    //         String(userId),
-    //         String(name),
-    //     );
-
-    //     try {
-    //         if (fs.existsSync(filePath)) {
-    //             res.sendFile(filePath);
-    //         } else {
-    //             res.status(HttpStatus.NOT_FOUND).json({
-    //                 message: 'File not found',
-    //             });
-    //         }
-    //     } catch (err) {
-    //         res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-    //             message: 'Error serving file',
-    //         });
-    //     }
-    // }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
@@ -185,7 +171,6 @@ export class MessageController {
                 userId,
             }),
         );
-        // const data = await this.messagesService.getImage(uuid, userId);
 
         if (!data) return;
         res.setHeader('Content-Type', data.mime_type);
@@ -204,15 +189,12 @@ export class MessageController {
     async downloadFile(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
 
-        if (!userId) return res.status(403).send('Unauthorized');
-
         const data = await firstValueFrom(
             this.messagesClient.send('get.messages.file', {
                 uuid,
                 userId,
             }),
         );
-        // const data = await this.messagesService.downloadFile(uuid, userId);
 
         if (!data) return res.status(404).send('File not found');
 

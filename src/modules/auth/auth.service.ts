@@ -13,23 +13,23 @@ import { IUser } from './interfaces/IUser.interface'
 
 @Injectable()
 export class AuthService {
-    private userClient: ClientKafka
-    private visitClient: ClientKafka
+    private userClient: ClientKafka;
+    private visitClient: ClientKafka;
 
     constructor(
         private readonly redis: RedisService,
         private readonly prisma: PrismaService,
         private readonly kafkaService: KafkaService,
     ) {
-        this.userClient = this.kafkaService.getUserClient()
-        this.visitClient = this.kafkaService.getVisitClient()
+        this.userClient = this.kafkaService.getUserClient();
+        this.visitClient = this.kafkaService.getVisitClient();
     }
-   
+
     async register(user: RegisterUserDto) {
         try {
             const isHaveUser = await firstValueFrom<boolean>(
                 this.userClient.send('find.user', {
-                    phone: user.phone,
+                    data: user.phone,
                     type: 'phone',
                 }),
             );
@@ -57,28 +57,26 @@ export class AuthService {
     async login(user: LoginUserDto) {}
 
     async logoutBySessionId(sessionId: string) {
-        const visit = await this.prisma.visit.findFirst({
-            where: {
-                session_id: sessionId,
-            },
-        });
+        const visit = await firstValueFrom(
+            this.visitClient.send('find.visit.by.sessionid', {
+                value: sessionId,
+                select: {
+                    id: true,
+                },
+            }),
+        );
 
         if (!visit) return;
 
-        await this.prisma.visit.update({
-            where: {
-                id: visit.id,
-            },
-            data: {
-                is_active: false,
-            },
-        });
+        return await firstValueFrom(
+            this.visitClient.send('logout.visit', { value: sessionId }),
+        );
     }
 
     async isValidatedUser(phone: string, password: string) {
         const user = await firstValueFrom<IUser>(
             this.userClient.send('find.user', {
-                phone,
+                data: phone,
                 type: 'phone',
             }),
         );
@@ -92,7 +90,7 @@ export class AuthService {
 
     public async isUserExist(phone: string): Promise<boolean> {
         return !!(await firstValueFrom(
-            this.userClient.send("find.user", { phone, type: 'phone' }),
+            this.userClient.send('find.user', { data: phone, type: 'phone' }),
         ));
     }
 
@@ -130,25 +128,20 @@ export class AuthService {
     }
 
     async isValidateVerificationCode(phone: string, code: string) {
-        // console.log(phone);
-        // console.log(code);
         const res = await this.checkVerificationCode(phone, code);
 
         if (res.message === AUTH.ERROR.PHONE_CODE_CHECK) {
             return null;
         }
 
-        const user = await this.prisma.user.findFirst({
-            where: {
-                phone,
-            },
-        });
+        const user = await firstValueFrom(
+            this.userClient.send('find.user', { data: phone, type: 'phone' }),
+        );
 
         if (!user) {
             const user = await firstValueFrom(
                 this.userClient.send('create.user', { phone }),
             );
-            // const user = await this.userService.createUser({ phone });
             return user;
         }
 
@@ -162,10 +155,15 @@ export class AuthService {
         let user_id: number;
 
         if (type === 'phone') {
-            const user = await this.prisma.user.findUnique({
-                where: { phone: value.toString() },
-                select: { id: true },
-            });
+            const user = await firstValueFrom(
+                this.userClient.send('find.user', {
+                    data: value.toString(),
+                    type: 'phone',
+                    select: {
+                        id: true,
+                    },
+                }),
+            );
 
             if (!user) {
                 return false;
@@ -197,14 +195,24 @@ export class AuthService {
                 name: `Subilink (${phone})`,
             });
 
-            const user = await this.prisma.user.findUnique({
-                where: {
-                    phone,
-                },
-                select: {
-                    id: true,
-                },
-            });
+            const user = await firstValueFrom(
+                this.userClient.send('find.user', {
+                    data: phone,
+                    type: 'phone',
+                    select: {
+                        id: true,
+                    },
+                }),
+            );
+
+            // const user = await this.prisma.user.findUnique({
+            //     where: {
+            //         phone,
+            //     },
+            //     select: {
+            //         id: true,
+            //     },
+            // });
 
             if (!user?.id) return { message: 'Not exists user' };
 
@@ -299,7 +307,7 @@ export class AuthService {
     }
 
     public async updateLastVisit(userId: string) {
-        this.visitClient.emit("update.last.visit", { userId })
+        this.visitClient.emit('update.last.visit', { userId });
     }
 
     public async newVisit(

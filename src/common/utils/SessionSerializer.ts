@@ -20,13 +20,14 @@ export class SessionSerializer extends PassportSerializer {
     }
 
     serializeUser(user: User, done: (err, user) => void) {
+        console.log("Serialize user " + user.id)
         done(null, user.id);
     }
 
     async deserializeUser(user: User, done: (err, user) => void) {
         console.log('Deserialize user ', user);
         const userDB = await firstValueFrom(
-            this.userClient.send('find.user', { userId: user.id, type: 'id' }),
+            this.userClient.send('find.user', { data: user, type: 'id' }),
         );
         return userDB ? done(null, userDB) : done(null, null);
     }

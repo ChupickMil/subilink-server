@@ -34,7 +34,6 @@ export class AuthController {
         @Body() { phone }: VerificationPhoneDto,
     ): Promise<Response> {
         const isUserExists = await this.authService.isUserExist(phone);
-        // console.log('Is user exist in DB: ' + isUserExists);
 
         await this.authService.sendVerificationCode(phone);
 
@@ -54,13 +53,13 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('check-code-phone')
     async checkCode(
-        @Req() req: Request,
-        @Res() res: Response & { req: { user: { id: number } } },
+        @Req() req: Request & { user: { id: number } },
+        // @Res() res: Response & { req: { user: { id: number } } },
         @Body() { phone }: CheckCodeDto,
-    ): Promise<Response> {
+    ) {
+        const user = req.user;
         const isUserReg = await this.authService.isUserReg(phone);
-        const user = res.req.user;
-        const sessionId = res.req.sessionID.split('.')[0];
+        const sessionId = req.sessionID.split('.')[0];
         const ip = req.ip;
         const userAgent = req.headers['user-agent'];
 
@@ -71,11 +70,11 @@ export class AuthController {
             );
 
             if (isTwoFAEnabled) {
-                return res.status(HttpStatus.OK).json({
+                return {
                     message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                     isTwoAuth: true,
                     isReg: true,
-                });
+                };
             } else {
                 if (user && user.id) {
                     await this.authService.newVisit(
@@ -85,11 +84,11 @@ export class AuthController {
                         userAgent,
                     );
                 }
-                return res.status(HttpStatus.OK).json({
+                return {
                     message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                     isTwoAuth: false,
                     isReg: true,
-                });
+                };
             }
         } else {
             if (user && user.id) {
@@ -100,10 +99,10 @@ export class AuthController {
                     userAgent,
                 );
             }
-            return res.status(HttpStatus.OK).json({
+            return {
                 message: AUTH.SUCCESS.PHONE_CODE_CHECK,
                 isReg: false,
-            });
+            };
         }
     }
 

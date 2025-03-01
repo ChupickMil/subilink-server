@@ -31,6 +31,7 @@ export class FriendController {
     async getFriends(@Req() req, @Query() query) {
         const userId = req.session.passport.user;
         const search = query.search;
+
         return await firstValueFrom(
             this.friendClient.send('get.friends', { userId, search }),
         );

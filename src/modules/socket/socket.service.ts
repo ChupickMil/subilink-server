@@ -100,9 +100,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             ),
         );
 
-        console.log('chatid')
-        console.log(chatId)
-
         if (!chatId) throw new Error('Chat not found');
 
         // Отправляем сообщение
@@ -114,12 +111,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 fileUuids,
             }),
         );
-        // const result = await this.messageService.sendNewMessageChat(
-        //     userId,
-        //     chatId,
-        //     content,
-        //     fileUuids,
-        // );
 
         // Уведомляем отправителя
         client.emit('messages', { ...result, userId, recipientId });

@@ -25,6 +25,9 @@ export class KafkaService {
         this.visitClient.subscribeToResponseOf('logout.by.id');
         this.visitClient.subscribeToResponseOf('get.date.visits');
         this.visitClient.subscribeToResponseOf('new.visit');
+        this.visitClient.subscribeToResponseOf('update.last.visit');
+        this.visitClient.subscribeToResponseOf('find.visit.by.sessionid');
+        this.visitClient.subscribeToResponseOf('logout.visit');
 
         this.messageClient.subscribeToResponseOf('get.messages');
         this.messageClient.subscribeToResponseOf('delete.messages');
