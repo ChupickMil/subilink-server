@@ -36,6 +36,7 @@ export class VisitController {
     @Get('logout')
     async logoutVisit(@Req() req, @Query() query: { id: string }) {
         const userId = req.session.passport.user;
+        
         return await firstValueFrom(
             this.client.emit('logout.by.id', {
                 id: query.id,

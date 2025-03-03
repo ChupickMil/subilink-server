@@ -16,7 +16,6 @@ import { IChatMessageDto, IFriendsRequestDto } from './types'
 @WebSocketGateway({
     cors: {
         origin: 'http://localhost:3000', // точный домен
-        // origin: 'http://192.168.31.168:3000', // точный домен
         // origin: 'http://192.168.31.179:3000', // точный домен
     },
 })
@@ -24,11 +23,13 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     private friendClient: ClientKafka;
     private chatClient: ClientKafka;
     private messageClient: ClientKafka;
+    private userClient: ClientKafka;
 
     constructor(private readonly kafkaService: KafkaService) {
         this.friendClient = this.kafkaService.getFriendClient();
         this.chatClient = this.kafkaService.getChatClient();
         this.messageClient = this.kafkaService.getMessageClient();
+        this.userClient = this.kafkaService.getUserClient();
     }
 
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
@@ -62,19 +63,23 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const { userId, recipientId, content, fileUuids } = dto;
 
         // Проверяем существование чата или создаем новый
-        const isHasChat = JSON.parse(await firstValueFrom(
-            this.chatClient.send('get.is.has.chat', {
-                userId,
-                recipientId,
-            }),
-        ));
+        const isHasChat = JSON.parse(
+            await firstValueFrom(
+                this.chatClient.send('get.is.has.chat', {
+                    userId,
+                    recipientId,
+                }),
+            ),
+        );
 
-        const isDeletedChat = JSON.parse(await firstValueFrom(
-            this.chatClient.send('get.is.deleted.chat', {
-                userId,
-                recipientId,
-            }),
-        ));
+        const isDeletedChat = JSON.parse(
+            await firstValueFrom(
+                this.chatClient.send('get.is.deleted.chat', {
+                    userId,
+                    recipientId,
+                }),
+            ),
+        );
 
         if (isDeletedChat) {
             await firstValueFrom(
@@ -83,7 +88,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         if (!isHasChat) {
-            console.log(123)
+            console.log(123);
             const isCreated = await firstValueFrom(
                 this.chatClient.send('create.chat', { userId, recipientId }),
             );
@@ -112,6 +117,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             }),
         );
 
+        const senderName = await firstValueFrom<{ name: string }>(
+            this.userClient.send('get.user.with.select', { userId, select: { name: true } }),
+        );
+
         // Уведомляем отправителя
         client.emit('messages', { ...result, userId, recipientId });
 
@@ -124,6 +133,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 ...result,
                 userId,
                 recipientId,
+                senderName: senderName.name,
             });
         } else {
             console.log(`Friend ${recipientId} is not connected`);
@@ -135,19 +145,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
     ) {
-        // Получаем сокет друга
-        const friendSocket = this.activeSockets.get(String(dto.friendId));
-
-        if (friendSocket) {
-            // Уведомляем друга
-            friendSocket.emit('friends-request-notification', {
-                message: `Новый запрос в друзья от пользователя ${dto.userId}`,
-                requesterId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.friendId} is not connected`);
-        }
-
         // записываем в бд
         await firstValueFrom(
             this.friendClient.send('add.friend', {
@@ -155,6 +152,27 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 friendId: dto.friendId,
             }),
         );
+
+        // Получаем сокет друга
+        const friendSocket = this.activeSockets.get(String(dto.friendId));
+
+        const senderName = await firstValueFrom<{ name: string }>(
+            this.userClient.send('get.user.with.select', { userId: dto.userId, select: { name: true } }),
+        );
+
+        if (friendSocket) {
+            // Уведомляем друга
+            friendSocket.emit('friends-request-notification', {
+                message: `Новый запрос в друзья от пользователя ${dto.userId}`,
+                requesterId: dto.userId,
+                senderName: senderName.name,
+                sendAt: new Date(),
+                userId: dto.userId
+            });
+        } else {
+            console.log(`Friend ${dto.friendId} is not connected`);
+        }
+
         // Подтверждаем действие инициатору
         client.emit('friends-request', { success: true });
     }
@@ -164,19 +182,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
     ) {
-        // Получаем сокет друга
-        const friendSocket = this.activeSockets.get(String(dto.friendId));
-
-        if (friendSocket) {
-            // Уведомляем друга
-            friendSocket.emit('friends-request-notification', {
-                message: `Ваш запрос принял ${dto.userId}`,
-                requesterId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.friendId} is not connected`);
-        }
-
         // обновляем бд
         await firstValueFrom(
             this.friendClient.send('accept.request', {
@@ -184,6 +189,26 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 friendId: dto.friendId,
             }),
         );
+
+        // Получаем сокет друга
+        const friendSocket = this.activeSockets.get(String(dto.friendId));
+
+        const senderName = await firstValueFrom<{ name: string }>(
+            this.userClient.send('get.user.with.select', { userId: dto.userId, select: { name: true } }),
+        );
+
+        if (friendSocket) {
+            // Уведомляем друга
+            friendSocket.emit('friends-request-accept-notification', {
+                message: `Ваш запрос принял ${dto.userId}`,
+                requesterId: dto.userId,
+                senderName: senderName.name,
+                acceptedAt: new Date(),
+                userId: dto.userId
+            });
+        } else {
+            console.log(`Friend ${dto.friendId} is not connected`);
+        }
 
         // Подтверждаем действие инициатору
         client.emit('friends-accept-request', { success: true });

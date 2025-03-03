@@ -19,6 +19,7 @@ export class KafkaService {
         this.userClient.subscribeToResponseOf('delete.user');
         this.userClient.subscribeToResponseOf('get.global.users');
         this.userClient.subscribeToResponseOf('update.user');
+        this.userClient.subscribeToResponseOf('get.user.with.select');
 
         this.visitClient.subscribeToResponseOf('new.visit');
         this.visitClient.subscribeToResponseOf('get.visits');

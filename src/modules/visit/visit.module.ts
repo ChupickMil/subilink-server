@@ -13,20 +13,6 @@ import { VisitController } from './visit.controller'
         AuthModule,
         RedisModule,
         KafkaModule
-        // ClientsModule.register([
-        //     {
-        //         name: 'VISIT_SERVICE',
-        //         transport: Transport.KAFKA,
-        //         options: {
-        //             client: {
-        //                 brokers: ['localhost:9092'],
-        //             },
-        //             consumer: {
-        //                 groupId: 'visit-service'
-        //             }
-        //         },
-        //     },
-        // ]),
     ],
     controllers: [VisitController],
     providers: [AuthenticatedGuard, TwoFAGuard],
