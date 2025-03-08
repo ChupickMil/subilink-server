@@ -37,6 +37,19 @@ export class FriendController {
         );
     }
 
+    @ApiResponse({ status: 200, type: FriendsDto })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('profile-friend')
+    async getProfileFriends(@Req() req, @Query() query: { id: string | null }) {
+        const userId = req.session.passport.user;
+        const profileId = query.id === 'null' ? userId : query.id
+
+        return await firstValueFrom(
+            this.friendClient.send('get.profile.friends', { profileId: profileId }),
+        );
+    }
+
     // @ApiResponse({ status: 200 })
     // @UseGuards(AuthenticatedGuard, TwoFAGuard)
     // @HttpCode(HttpStatus.OK)

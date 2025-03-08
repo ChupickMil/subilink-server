@@ -49,6 +49,7 @@ export class KafkaService {
         this.chatClient.subscribeToResponseOf('get.chat.id');
 
         this.friendClient.subscribeToResponseOf('get.friends');
+        this.friendClient.subscribeToResponseOf('get.profile.friends');
         this.friendClient.subscribeToResponseOf('delete.friend');
         this.friendClient.subscribeToResponseOf('get.friends.requests');
         this.friendClient.subscribeToResponseOf('get.outgoing.requests');
