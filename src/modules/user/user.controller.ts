@@ -7,7 +7,8 @@ import {
     Query,
     Req,
     Res,
-    UseGuards
+    UseGuards,
+    UseInterceptors
 } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 
@@ -16,6 +17,7 @@ import { Response } from 'express'
 import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
 import { KafkaService } from '../kafka/kafka.service'
 import { UpdateNameDto } from './dto'
 import { GlobalUsers } from './dto/globalUser.dto'
@@ -40,6 +42,7 @@ export class UserController {
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @UseInterceptors(TrackVisitInterceptor)
     @Get('profile-user')
     async getProfileUser(@Req() req, @Query() query: { id: string }) {
         const userId = req.session.passport.user;

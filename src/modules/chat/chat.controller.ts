@@ -7,7 +7,8 @@ import {
     Query,
     Req,
     Res,
-    UseGuards
+    UseGuards,
+    UseInterceptors
 } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices'
 import { ApiResponse } from '@nestjs/swagger'
@@ -16,6 +17,7 @@ import { firstValueFrom } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
 import { KafkaService } from '../kafka/kafka.service'
 import { ChatInfoDto } from './dto/ChatInfo.dto'
 import { FilteredChatDto } from './dto/FilteredChat.dto'
@@ -32,6 +34,7 @@ export class ChatController {
 
     @ApiResponse({ status: 200, type: FilteredChatDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @UseInterceptors(TrackVisitInterceptor)
     @HttpCode(HttpStatus.OK)
     @Get('chats')
     async getChats(@Req() req, @Query() query: { search: string }) {

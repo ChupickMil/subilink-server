@@ -6,13 +6,15 @@ import {
     HttpStatus,
     Query,
     Req,
-    UseGuards
+    UseGuards,
+    UseInterceptors
 } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import { ApiResponse } from '@nestjs/swagger'
 import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
 import { KafkaService } from '../kafka/kafka.service'
 import { FriendsDto } from './dto/FriendsDto'
 
@@ -27,6 +29,7 @@ export class FriendController {
     @ApiResponse({ status: 200, type: FriendsDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
+    @UseInterceptors(TrackVisitInterceptor)
     @Get('friend')
     async getFriends(@Req() req, @Query() query) {
         const userId = req.session.passport.user;
