@@ -3,7 +3,8 @@ interface IChatMessageDto {
 	recipientId: string;
 	content: string;
 	time: string;
-	fileUuids: string[]
+	fileUuids: string[],
+	replyMessageId: string
 }
 
 interface IFriendsRequestDto {

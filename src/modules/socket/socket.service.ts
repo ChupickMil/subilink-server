@@ -60,7 +60,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: any,
     ) {
-        const { userId, recipientId, content, fileUuids } = dto;
+        const { userId, recipientId, content, fileUuids, replyMessageId } = dto;
 
         // Проверяем существование чата или создаем новый
         const isHasChat = JSON.parse(
@@ -114,6 +114,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 chatId,
                 content,
                 fileUuids,
+                replyMessageId
             }),
         );
 
