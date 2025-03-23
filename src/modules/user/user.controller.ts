@@ -4,21 +4,23 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Param,
     Patch,
     Query,
     Req,
     Res,
     UploadedFiles,
     UseGuards,
-    UseInterceptors
+    UseInterceptors,
 } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import { Response } from 'express'
+import * as fs from 'fs'
 import * as fsPromise from 'fs/promises'
 import { memoryStorage } from 'multer'
-import path from 'path'
+import * as path from 'path'
 import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
@@ -58,6 +60,7 @@ export class UserController {
                 userId: id,
                 select: {
                     name: true,
+                    img_uuid: true
                 },
             }),
         );
@@ -123,9 +126,10 @@ export class UserController {
         const typeParts = files[0].originalname.split('.');
         const typeFile = '.' + typeParts[typeParts.length - 1];
 
-        const originalName = Buffer.from(files[0].originalname, 'latin1').toString(
-            'utf8',
-        );
+        const originalName = Buffer.from(
+            files[0].originalname,
+            'latin1',
+        ).toString('utf8');
 
         const filePath = path.join(userDir, uuid + typeFile);
 
@@ -141,11 +145,64 @@ export class UserController {
             original_name: originalName,
             user_id: Number(userId),
         };
-        
+
         await firstValueFrom(
             this.userClient.send('update.avatar.file', {
                 avatar,
             }),
         );
+
+        return true
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('avatar/:uuid')
+    async getImageByUuid(@Req() req, @Param('uuid') uuid: string, @Res() res) {
+        const userId = req.session.passport.user;
+
+        if (!userId) return;
+
+        const data = await firstValueFrom(
+            this.userClient.send('get.profile.image.by.uuid', {
+                uuid,
+                userId,
+            }),
+        );
+
+        if (!data) return;
+        res.setHeader('Content-Type', data.mime_type);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(data.original_name)}"`,
+        );
+
+        fs.createReadStream(data.path).pipe(res);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('avatar')
+    async getImage(@Req() req, @Res() res) {
+        const userId = req.session.passport.user;
+
+        if (!userId) return;
+
+        const data = await firstValueFrom(
+            this.userClient.send('get.profile.image', {
+                userId,
+            }),
+        );
+
+        if (!data) return;
+        res.setHeader('Content-Type', data.mime_type);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(data.original_name)}"`,
+        );
+
+        fs.createReadStream(data.path).pipe(res);
     }
 }

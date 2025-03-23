@@ -21,6 +21,8 @@ export class KafkaService {
         this.userClient.subscribeToResponseOf('update.user');
         this.userClient.subscribeToResponseOf('get.user.with.select');
         this.userClient.subscribeToResponseOf('update.avatar.file');
+        this.userClient.subscribeToResponseOf('get.profile.image.by.uuid');
+        this.userClient.subscribeToResponseOf('get.profile.image');
 
         this.visitClient.subscribeToResponseOf('new.visit');
         this.visitClient.subscribeToResponseOf('get.visits');
