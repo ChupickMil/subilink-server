@@ -28,6 +28,7 @@ import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
 import { KafkaService } from '../kafka/kafka.service'
 import { UpdateNameDto } from './dto'
 import { GlobalUsers } from './dto/globalUser.dto'
+import { UpdateDescriptionDto } from './dto/updateDescription'
 
 @Controller('users')
 export class UserController {
@@ -80,6 +81,28 @@ export class UserController {
             this.userClient.send('update.user', {
                 userId,
                 name: user.name,
+            }),
+        );
+
+        return answer.isSuccess
+            ? res.status(HttpStatus.OK).json({ success: true })
+            : res.status(HttpStatus.BAD_REQUEST).json({ success: false });
+    }
+
+    @ApiResponse({ status: 200, type: UpdateDescriptionDto })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @Patch('description') 
+    async updateDescription(
+        @Req() req,
+        @Body() user: UpdateDescriptionDto,
+        @Res() res: Response,
+    ) {
+        const userId = req.session.passport.user;
+
+        const answer = await firstValueFrom<{ isSuccess: boolean }>(
+            this.userClient.send('update.user', {
+                userId,
+                description: user.description,
             }),
         );
 
