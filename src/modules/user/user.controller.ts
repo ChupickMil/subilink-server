@@ -6,6 +6,7 @@ import {
     HttpStatus,
     Param,
     Patch,
+    Post,
     Query,
     Req,
     Res,
@@ -16,6 +17,7 @@ import {
 import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
+import { isArray } from 'class-validator'
 import { Response } from 'express'
 import * as fs from 'fs'
 import * as fsPromise from 'fs/promises'
@@ -61,7 +63,7 @@ export class UserController {
                 userId: id,
                 select: {
                     name: true,
-                    img_uuid: true
+                    avatar_uuid: true,
                 },
             }),
         );
@@ -91,7 +93,7 @@ export class UserController {
 
     @ApiResponse({ status: 200, type: UpdateDescriptionDto })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Patch('description') 
+    @Patch('description')
     async updateDescription(
         @Req() req,
         @Body() user: UpdateDescriptionDto,
@@ -175,7 +177,7 @@ export class UserController {
             }),
         );
 
-        return true
+        return true;
     }
 
     @ApiResponse({ status: 201 })
@@ -227,5 +229,108 @@ export class UserController {
         );
 
         fs.createReadStream(data.path).pipe(res);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('photos-uuids')
+    async getPhotosUuids(@Req() req) {
+        const userId = req.session.passport.user;
+
+        return await firstValueFrom(
+            this.userClient.send('get.user.with.select', {
+                userId,
+                select: {
+                    img_uuids: true,
+                },
+            }),
+        );
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('photos/:uuid')
+    async getPhotos(@Req() req, @Res() res, @Param('uuid') uuid: string) {
+        const userId = req.session.passport.user;
+
+        if(!userId) return
+
+        const data = await firstValueFrom(
+            this.userClient.send('get.profile.photo', {
+                uuid,
+                userId,
+            }),
+        );
+
+        if (!data || !data.length) return;
+
+        res.setHeader('Content-Type', data.mime_type);
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename="${encodeURIComponent(data.original_name)}"`,
+        );
+
+        fs.createReadStream(data.path).pipe(res);
+    }
+
+    @ApiResponse({ status: 201 })
+    @ApiConsumes('multipart/form-data')
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @UseInterceptors(
+        FilesInterceptor('files', 10, {
+            storage: memoryStorage(),
+        }),
+    )
+    @Post('photos')
+    async addPhotos(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
+        const userId = req.session.passport.user;
+        const uuids = isArray(req.body.uuid)
+            ? req.body.uuid
+            : Array(req.body.uuid);
+        const userDir = path.join('uploads', String(userId));
+
+        files.forEach(async (file, i) => {
+            try {
+                await fsPromise.access(userDir).catch(async () => {
+                    await fsPromise.mkdir(userDir, { recursive: true });
+                });
+            } catch (err) {
+                throw new Error('Failed to create directory for user files');
+            }
+
+            const typeParts = file.originalname.split('.');
+            const typeFile = '.' + typeParts[typeParts.length - 1];
+
+            const originalName = Buffer.from(
+                file.originalname,
+                'latin1',
+            ).toString('utf8');
+
+            const filePath = path.join(userDir, uuids[i] + typeFile);
+
+            const fullPath = path.join(process.cwd(), filePath);
+            await fsPromise.writeFile(fullPath, Buffer.from(file.buffer));
+
+            const fileForDb = {
+                uuid: uuids[i],
+                path: fullPath,
+                type: typeFile,
+                size: file.size,
+                mime_type: file.mimetype,
+                original_name: originalName,
+                user_id: Number(userId),
+            };
+
+            await firstValueFrom(
+                this.userClient.send('add.profile.photos', {
+                    file: fileForDb,
+                }),
+            );
+        });
+
+        return true;
     }
 }
