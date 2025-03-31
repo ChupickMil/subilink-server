@@ -2,6 +2,7 @@ import {
     Controller,
     Get,
     Inject,
+    Param,
     Query,
     Req,
     Res,
@@ -47,9 +48,10 @@ export class VisitController {
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @Get('date-visits')
-    async getDateVisits(@Req() req) {
-        const userId = req.session.passport.user;
+    @Get('date-visits/:user_id?') 
+    async getDateVisits(@Req() req, @Param('user_id') userIdParam?: string) { 
+        const userId = userIdParam ?? req.session.passport.user;
+
         return await firstValueFrom(
             this.client.send('get.date.visits', { userId }),
         );

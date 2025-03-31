@@ -67,6 +67,18 @@ import { KafkaService } from './kafka.service'
                     },
                 },
             },
+            {
+                name: 'FILES_SERVICE',
+                transport: Transport.KAFKA,
+                options: {
+                    client: {
+                        brokers: ['localhost:9092'],
+                    },
+                    consumer: {
+                        groupId: 'files-service',
+                    },
+                },
+            },
         ]),
     ],
 

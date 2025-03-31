@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -35,9 +36,11 @@ import { UpdateDescriptionDto } from './dto/updateDescription'
 @Controller('users')
 export class UserController {
     private userClient: ClientKafka;
+    private fileClient: ClientKafka;
 
     constructor(private readonly kafkaService: KafkaService) {
         this.userClient = kafkaService.getUserClient();
+        this.fileClient = kafkaService.getFileClient();
     }
 
     @ApiResponse({ status: 200 })
@@ -180,14 +183,31 @@ export class UserController {
         return true;
     }
 
-    @ApiResponse({ status: 201 })
+    @ApiResponse({ status: 200, type: GlobalUsers })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @Patch('update-avatar-by-uuid')
+    async updateAvatarByUuid(@Req() req, @Body() body: { uuid: string }) {
+        const userId = req.session.passport.user;
+        const uuid = body.uuid;
+
+        return this.userClient.send('update.avatar.by.uuid', { userId, uuid });
+    }
+
+    @ApiResponse({ status: 200, type: GlobalUsers })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @Delete('photo/:uuid')
+    async deletePhoto(@Req() req, @Param('uuid') uuid: string) {
+        const userId = req.session.passport.user;
+
+        return this.userClient.send('delete.photo.by.uuid', { userId, uuid });
+    }
+
+    @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('avatar/:uuid')
     async getImageByUuid(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
-
-        if (!userId) return;
 
         const data = await firstValueFrom(
             this.userClient.send('get.profile.image.by.uuid', {
@@ -196,7 +216,10 @@ export class UserController {
             }),
         );
 
-        if (!data) return;
+        if (!data) {
+            return res.status(HttpStatus.NOT_FOUND).send('Image not found');
+        }
+
         res.setHeader('Content-Type', data.mime_type);
         res.setHeader(
             'Content-Disposition',
@@ -209,36 +232,11 @@ export class UserController {
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Get('avatar')
-    async getImage(@Req() req, @Res() res) {
-        const userId = req.session.passport.user;
+    @Get('photos-files/:user_id?')
+    async getPhotosUuids(@Req() req, @Param('user_id') user_id?: string) {
+        const userId = user_id ?? req.session.passport.user;
 
-        if (!userId) return;
-
-        const data = await firstValueFrom(
-            this.userClient.send('get.profile.image', {
-                userId,
-            }),
-        );
-
-        if (!data) return;
-        res.setHeader('Content-Type', data.mime_type);
-        res.setHeader(
-            'Content-Disposition',
-            `inline; filename="${encodeURIComponent(data.original_name)}"`,
-        );
-
-        fs.createReadStream(data.path).pipe(res);
-    }
-
-    @ApiResponse({ status: 201 })
-    @UseGuards(AuthenticatedGuard, TwoFAGuard)
-    @HttpCode(HttpStatus.OK)
-    @Get('photos-uuids')
-    async getPhotosUuids(@Req() req) {
-        const userId = req.session.passport.user;
-
-        return await firstValueFrom(
+        const { img_uuids } = await firstValueFrom<{ img_uuids: string[] }>(
             this.userClient.send('get.user.with.select', {
                 userId,
                 select: {
@@ -246,16 +244,30 @@ export class UserController {
                 },
             }),
         );
+
+        const files = await firstValueFrom(
+            this.fileClient.send('get.files.by.uuids', {
+                uuids: img_uuids,
+            }),
+        );
+
+        return files;
     }
 
     @ApiResponse({ status: 201 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
-    @Get('photos/:uuid')
-    async getPhotos(@Req() req, @Res() res, @Param('uuid') uuid: string) {
-        const userId = req.session.passport.user;
+    @Get('photos/:user_id?/:uuid')
+    async getPhotos(
+        @Req() req,
+        @Res() res,
+        @Param('uuid') uuid: string,
+        @Param('user_id') user_id?: string,
+    ) {
+        const userId = user_id ?? req.session.passport.user;
 
-        if(!userId) return
+        if (!userId) return;
+        if (!uuid) return;
 
         const data = await firstValueFrom(
             this.userClient.send('get.profile.photo', {
@@ -264,7 +276,7 @@ export class UserController {
             }),
         );
 
-        if (!data || !data.length) return;
+        if (!data.mime_type) return;
 
         res.setHeader('Content-Type', data.mime_type);
         res.setHeader(

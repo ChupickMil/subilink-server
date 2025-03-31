@@ -9,6 +9,7 @@ export class KafkaService {
         @Inject('MESSAGE_SERVICE') private readonly messageClient: ClientKafka,
         @Inject('CHAT_SERVICE') private readonly chatClient: ClientKafka,
         @Inject('FRIEND_SERVICE') private readonly friendClient: ClientKafka,
+        @Inject('FILES_SERVICE') private readonly fileClient: ClientKafka,
     ) {}
 
     async onModuleInit() {
@@ -24,7 +25,9 @@ export class KafkaService {
         this.userClient.subscribeToResponseOf('get.profile.image.by.uuid');
         this.userClient.subscribeToResponseOf('get.profile.image');
         this.userClient.subscribeToResponseOf('get.profile.photo');
+        this.userClient.subscribeToResponseOf('update.avatar.by.uuid');
         this.userClient.subscribeToResponseOf('add.profile.photos');
+        this.userClient.subscribeToResponseOf('delete.photo.by.uuid');
 
         this.visitClient.subscribeToResponseOf('new.visit');
         this.visitClient.subscribeToResponseOf('get.visits');
@@ -63,11 +66,14 @@ export class KafkaService {
         this.friendClient.subscribeToResponseOf('accept.request');
         this.friendClient.subscribeToResponseOf('cancel.outgoing.request');
 
+        this.fileClient.subscribeToResponseOf('get.files.by.uuids');
+
         await this.visitClient.connect();
         await this.userClient.connect();
         await this.messageClient.connect();
         await this.friendClient.connect();
         await this.chatClient.connect();
+        await this.fileClient.connect();
     }
 
     public getMessageClient() {
@@ -88,5 +94,9 @@ export class KafkaService {
 	
     public getChatClient() {
         return this.chatClient;
+    }
+
+    public getFileClient() {
+        return this.fileClient;
     }
 }
