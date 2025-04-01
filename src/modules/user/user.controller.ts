@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -25,6 +26,7 @@ import * as fsPromise from 'fs/promises'
 import { memoryStorage } from 'multer'
 import * as path from 'path'
 import { firstValueFrom } from 'rxjs'
+import { ALLOWED_IMAGE_MIME_TYPE } from 'src/common/constants/imageExtension'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
@@ -122,6 +124,7 @@ export class UserController {
     async getGlobalUsers(@Req() req, @Query() query: { search: string }) {
         const userId = req.session.passport.user;
         const search = query.search;
+
         return this.userClient.send('get.global.users', { userId, search });
     }
 
@@ -132,6 +135,13 @@ export class UserController {
     @UseInterceptors(
         FilesInterceptor('files', 10, {
             storage: memoryStorage(),
+            fileFilter: (req, file, callback) => {
+                if(!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)){
+                    return callback(new BadRequestException("Неверный тип файла"), false)
+                }
+
+                callback(null, true)
+            }
         }),
     )
     @Patch('update-avatar')
@@ -233,7 +243,7 @@ export class UserController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('photos-files/:user_id?')
-    async getPhotosUuids(@Req() req, @Param('user_id') user_id?: string) {
+    async getPhotosUuids(@Req() req, @Query('take') take: string, @Query('user_id') user_id?: string) {
         const userId = user_id ?? req.session.passport.user;
 
         const { img_uuids } = await firstValueFrom<{ img_uuids: string[] }>(
@@ -248,6 +258,7 @@ export class UserController {
         const files = await firstValueFrom(
             this.fileClient.send('get.files.by.uuids', {
                 uuids: img_uuids,
+                take
             }),
         );
 
@@ -294,6 +305,13 @@ export class UserController {
     @UseInterceptors(
         FilesInterceptor('files', 10, {
             storage: memoryStorage(),
+            fileFilter: (req, file, callback) => {
+                if(!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)){
+                    return callback(new BadRequestException("Неверный тип файла"), false)
+                }
+
+                callback(null, true)
+            }
         }),
     )
     @Post('photos')
