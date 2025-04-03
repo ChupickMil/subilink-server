@@ -209,7 +209,13 @@ export class UserController {
     async deletePhoto(@Req() req, @Param('uuid') uuid: string) {
         const userId = req.session.passport.user;
 
-        return this.userClient.send('delete.photo.by.uuid', { userId, uuid });
+        const deletedFile = await firstValueFrom(this.userClient.send('delete.file.by.uuid', { userId, uuid }));
+        
+        await fsPromise.access(deletedFile.path).then(async () => {
+            return await fsPromise.rm(deletedFile.path)
+        }).catch(err => {
+            return err
+        });
     }
 
     @ApiResponse({ status: 200 })
@@ -243,22 +249,13 @@ export class UserController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('photos-files/:user_id?')
-    async getPhotosUuids(@Req() req, @Query('take') take: string, @Query('user_id') user_id?: string) {
-        const userId = user_id ?? req.session.passport.user;
-
-        const { img_uuids } = await firstValueFrom<{ img_uuids: string[] }>(
-            this.userClient.send('get.user.with.select', {
-                userId,
-                select: {
-                    img_uuids: true,
-                },
-            }),
-        );
+    async getPhotosUuids(@Req() req, @Query('lastId') lastId: string, @Query('user_id') user_id?: string) {
+        const userId = user_id?.length ? user_id : req.session.passport.user;
 
         const files = await firstValueFrom(
-            this.fileClient.send('get.files.by.uuids', {
-                uuids: img_uuids,
-                take
+            this.fileClient.send('get.profile.files.by.userid', {
+                userId: Number(userId),
+                lastId: Number(lastId)
             }),
         );
 

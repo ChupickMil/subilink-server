@@ -27,7 +27,7 @@ export class KafkaService {
         this.userClient.subscribeToResponseOf('get.profile.photo');
         this.userClient.subscribeToResponseOf('update.avatar.by.uuid');
         this.userClient.subscribeToResponseOf('add.profile.photos');
-        this.userClient.subscribeToResponseOf('delete.photo.by.uuid');
+        this.userClient.subscribeToResponseOf('delete.file.by.uuid');
 
         this.visitClient.subscribeToResponseOf('new.visit');
         this.visitClient.subscribeToResponseOf('get.visits');
@@ -67,6 +67,7 @@ export class KafkaService {
         this.friendClient.subscribeToResponseOf('cancel.outgoing.request');
 
         this.fileClient.subscribeToResponseOf('get.files.by.uuids');
+        this.fileClient.subscribeToResponseOf('get.profile.files.by.userid');
 
         await this.visitClient.connect();
         await this.userClient.connect();
