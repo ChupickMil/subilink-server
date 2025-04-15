@@ -9,25 +9,20 @@ export class RedisService {
 
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
-        // @Inject("REDIS_SERVICE") private readonly redisService: ClientKafka,
         private readonly configService: ConfigService,
     ) {
+        const host = this.configService.get('redis_host');
+        const port = this.configService.get('redis_port') || 6379;
+        const password = this.configService.get('redis_password');
+
         this.client = createClient({
-            url: `redis://127.0.0.1:${this.configService.get('redis_port') || 6379}`,
+            url: `redis://:${password}@${host}:${port}`,
         });
         this.client.connect().catch(console.error);
     }
 
-    //async onModuleInit() {
-    //     this.redisService.subscribeToResponseOf('get.redis.client')
-    //     this.redisService.subscribeToResponseOf('get.redis.client.reply');
-
-    //     await this.redisService.connect()
-    // }
-
     async getClient(): Promise<RedisClientType> {
         return this.client;
-        // return await firstValueFrom(this.redisService.send('get.redis.client', {}))
     }
 
     async set(key: string, value: any, ttl: number): Promise<void> {

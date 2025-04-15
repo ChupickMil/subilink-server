@@ -9,30 +9,18 @@ import { RedisService } from './redis.service'
         CacheModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: async (configService: ConfigService) => ({
-                store: redisStore,
-                host: configService.get('redis_host'),
-                port: configService.get('redis_port'),
-                ttl: configService.get('cache_ttl'),
-                max: configService.get('max_item-in-cache'),
-            }),
+            useFactory: async (configService: ConfigService) => {
+                return {
+                    store: redisStore,
+                    socket: {
+                        host: configService.get('redis_host'),
+                        port: configService.get('redis_post'),
+                    },
+                    ttl: configService.get('cache_ttl'),
+                    max: configService.get('max_item_in_cache'),
+                };
+            },
         }),
-        // ClientsModule.register([
-        //     {
-        //         name: 'REDIS_SERVICE',
-        //         transport: Transport.KAFKA,
-        //         options: {
-        //             client: {
-        //                 clientId: 'redis',
-        //                 brokers: ['localhost:9092'],
-        //             },
-        //             consumer: {
-        //                 groupId: 'redis-service',
-        //                 allowAutoTopicCreation: true
-        //             },
-        //         },
-        //     },
-        // ]),
     ],
     providers: [RedisService, ConfigService],
     exports: [RedisService],

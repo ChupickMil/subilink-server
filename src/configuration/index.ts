@@ -7,7 +7,9 @@ export default () => ({
     db_host: process.env.DB_HOST,
     redis_host: process.env.REDIS_HOST,
     redis_port: process.env.REDIS_PORT,
+    redis_password: process.env.REDIS_PASSWORD,
     cache_ttl: process.env.REDIS_TTL,
     max_item_in_cache: process.env.MAX_ITEM_IN_CACHE,
+    kafka_broker: process.env.KAFKA_BROKER,
     // uploads_path: process.env.UPLOADS_PATH
 });
