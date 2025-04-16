@@ -5,6 +5,7 @@ import RedisStore from 'connect-redis'
 import * as cookieParser from 'cookie-parser'
 import * as session from 'express-session'
 import * as passport from 'passport'
+import { SocketIoAdapter } from './adapter/SocketAdapter'
 import { AppModule } from './modules/app/app.module'
 import { RedisService } from './modules/redis/redis.service'
 
@@ -46,11 +47,17 @@ async function bootstrap() {
     app.use(passport.session());
 
     app.enableCors({
-        origin: ['http://localhost:3000', 'http://192.168.31.60:3000', 'http://192.168.31.179:3000'],
+        origin: [
+            'http://localhost:3000',
+            'http://192.168.31.60:3000',
+            'http://192.168.31.179:3000',
+        ],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
         credentials: true, // поддержка cookies
         exposedHeaders: ['Content-Disposition'],
     });
+
+    app.useWebSocketAdapter(new SocketIoAdapter(app));
 
     await app.listen(process.env.PORT ?? 3000, () =>
         console.log('Server started: ' + process.env.PORT),

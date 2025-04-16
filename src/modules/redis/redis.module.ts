@@ -10,12 +10,13 @@ import { RedisService } from './redis.service'
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: async (configService: ConfigService) => {
+                const host = configService.get('redis_host')
+                const port = configService.get('redis_port')
+                const pass = configService.get('redis_password')
+                
                 return {
                     store: redisStore,
-                    socket: {
-                        host: configService.get('redis_host'),
-                        port: configService.get('redis_post'),
-                    },
+                    url: `redis://:${pass}@${host}:${port}`,
                     ttl: configService.get('cache_ttl'),
                     max: configService.get('max_item_in_cache'),
                 };

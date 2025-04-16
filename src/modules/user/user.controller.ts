@@ -63,13 +63,15 @@ export class UserController {
         const userId = req.session.passport.user;
         const id = query.id ?? userId;
 
+        if (Number(userId) !== Number(id)) {
+            this.userClient.emit('new.views', {
+                userId,
+                profileId: id,
+            });
+        }
         return await firstValueFrom(
-            this.userClient.send('get.user.with.select', {
+            this.userClient.send('get.profile.user', {
                 userId: id,
-                select: {
-                    name: true,
-                    avatar_uuid: true,
-                },
             }),
         );
     }
@@ -136,12 +138,15 @@ export class UserController {
         FilesInterceptor('files', 10, {
             storage: memoryStorage(),
             fileFilter: (req, file, callback) => {
-                if(!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)){
-                    return callback(new BadRequestException("Неверный тип файла"), false)
+                if (!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)) {
+                    return callback(
+                        new BadRequestException('Неверный тип файла'),
+                        false,
+                    );
                 }
 
-                callback(null, true)
-            }
+                callback(null, true);
+            },
         }),
     )
     @Patch('update-avatar')
@@ -209,13 +214,18 @@ export class UserController {
     async deletePhoto(@Req() req, @Param('uuid') uuid: string) {
         const userId = req.session.passport.user;
 
-        const deletedFile = await firstValueFrom(this.userClient.send('delete.file.by.uuid', { userId, uuid }));
-        
-        await fsPromise.access(deletedFile.path).then(async () => {
-            return await fsPromise.rm(deletedFile.path)
-        }).catch(err => {
-            return err
-        });
+        const deletedFile = await firstValueFrom(
+            this.userClient.send('delete.file.by.uuid', { userId, uuid }),
+        );
+
+        await fsPromise
+            .access(deletedFile.path)
+            .then(async () => {
+                return await fsPromise.rm(deletedFile.path);
+            })
+            .catch((err) => {
+                return err;
+            });
     }
 
     @ApiResponse({ status: 200 })
@@ -249,13 +259,17 @@ export class UserController {
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
     @HttpCode(HttpStatus.OK)
     @Get('photos-files/:user_id?')
-    async getPhotosUuids(@Req() req, @Query('lastId') lastId: string, @Query('user_id') user_id?: string) {
+    async getPhotosUuids(
+        @Req() req,
+        @Query('lastId') lastId: string,
+        @Query('user_id') user_id?: string,
+    ) {
         const userId = user_id?.length ? user_id : req.session.passport.user;
 
         const files = await firstValueFrom(
             this.fileClient.send('get.profile.files.by.userid', {
                 userId: Number(userId),
-                lastId: Number(lastId)
+                lastId: Number(lastId),
             }),
         );
 
@@ -303,12 +317,15 @@ export class UserController {
         FilesInterceptor('files', 10, {
             storage: memoryStorage(),
             fileFilter: (req, file, callback) => {
-                if(!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)){
-                    return callback(new BadRequestException("Неверный тип файла"), false)
+                if (!ALLOWED_IMAGE_MIME_TYPE.includes(file.mimetype)) {
+                    return callback(
+                        new BadRequestException('Неверный тип файла'),
+                        false,
+                    );
                 }
 
-                callback(null, true)
-            }
+                callback(null, true);
+            },
         }),
     )
     @Post('photos')

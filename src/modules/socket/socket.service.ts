@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, UseGuards } from '@nestjs/common'
 import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import {
     ConnectedSocket,
@@ -9,7 +9,12 @@ import {
     WebSocketGateway,
 } from '@nestjs/websockets'
 import { firstValueFrom } from 'rxjs'
+import { Socket } from 'socket.io'
+import { SocketUser } from 'src/common/decorators/UserSocket.decorator'
+import { SocketAuthenticatedGuard } from 'src/common/guards/SocketAuthenticatedGuard'
 import { KafkaService } from '../kafka/kafka.service'
+import { MapService } from '../map/map.service'
+import { RedisService } from '../redis/redis.service'
 import { IChatMessageDto, IFriendsRequestDto } from './types'
 
 @Injectable()
@@ -25,7 +30,11 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     private messageClient: ClientKafka;
     private userClient: ClientKafka;
 
-    constructor(private readonly kafkaService: KafkaService) {
+    constructor(
+        private readonly kafkaService: KafkaService,
+        private readonly mapService: MapService,
+        private readonly redis: RedisService,
+    ) {
         this.friendClient = this.kafkaService.getFriendClient();
         this.chatClient = this.kafkaService.getChatClient();
         this.messageClient = this.kafkaService.getMessageClient();
@@ -55,6 +64,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('messages')
     async handleEvent(
         @MessageBody() dto: IChatMessageDto,
@@ -114,12 +124,15 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 chatId,
                 content,
                 fileUuids,
-                replyMessageId
+                replyMessageId,
             }),
         );
 
         const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', { userId, select: { name: true } }),
+            this.userClient.send('get.user.with.select', {
+                userId,
+                select: { name: true },
+            }),
         );
 
         // Уведомляем отправителя
@@ -141,6 +154,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('friends-request')
     async handleFriendsRequests(
         @MessageBody() dto: IFriendsRequestDto,
@@ -158,7 +172,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
         const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', { userId: dto.userId, select: { name: true } }),
+            this.userClient.send('get.user.with.select', {
+                userId: dto.userId,
+                select: { name: true },
+            }),
         );
 
         if (friendSocket) {
@@ -168,7 +185,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 requesterId: dto.userId,
                 senderName: senderName.name,
                 sendAt: new Date(),
-                userId: dto.userId
+                userId: dto.userId,
             });
         } else {
             console.log(`Friend ${dto.friendId} is not connected`);
@@ -178,6 +195,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('friends-request', { success: true });
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('friends-accept-requests')
     async handleFriendsAcceptRequest(
         @MessageBody() dto: IFriendsRequestDto,
@@ -195,7 +213,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
         const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', { userId: dto.userId, select: { name: true } }),
+            this.userClient.send('get.user.with.select', {
+                userId: dto.userId,
+                select: { name: true },
+            }),
         );
 
         if (friendSocket) {
@@ -205,7 +226,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 requesterId: dto.userId,
                 senderName: senderName.name,
                 acceptedAt: new Date(),
-                userId: dto.userId
+                userId: dto.userId,
             });
         } else {
             console.log(`Friend ${dto.friendId} is not connected`);
@@ -215,6 +236,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('friends-accept-request', { success: true });
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('friends-cancel-outgoing-request')
     async handleFriendsCancelRequest(
         @MessageBody() dto: IFriendsRequestDto,
@@ -232,6 +254,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('friends-cancel-outgoing-request', { success: true });
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('online-users')
     async handleOnlineUser(
         @MessageBody() dto: number[],
@@ -252,6 +275,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('online-users', onlineUser);
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('messages-list-invalidate')
     async handleMessageListRefresh(
         @MessageBody() dto: { userId: string; chatId: string },
@@ -267,6 +291,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('messages-user-list-invalidate')
     async handleUserListRefresh(
         @MessageBody() dto: { userId: string; chatId: string },
@@ -282,6 +307,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
+    @UseGuards(SocketAuthenticatedGuard)
     @SubscribeMessage('messages-read')
     async handleMessageRead(
         @MessageBody()
@@ -292,8 +318,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             friend_id: string;
             read_at: string;
         }[],
-        @ConnectedSocket() client: any,
+        @ConnectedSocket() client: Socket,
     ) {
+        
+
         const groupedMessages = dto.reduce(
             (acc, curr) => {
                 acc[curr.friend_id] = acc[curr.friend_id] || [];
@@ -328,5 +356,15 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             this.messageClient.send('update.message.status', dto),
         );
         // await this.messageService.updateMessageRead(dto);
+    }
+
+    @UseGuards(SocketAuthenticatedGuard)
+    @SubscribeMessage('save-geolocation')
+    async saveGeolocation(
+        @MessageBody() dto: [number, number],
+        @ConnectedSocket() client: Socket,
+        @SocketUser() user: number
+    ) {
+        await this.mapService.saveGeolocation(user, dto);
     }
 }
