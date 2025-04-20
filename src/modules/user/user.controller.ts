@@ -377,4 +377,18 @@ export class UserController {
 
         return true;
     }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('position')
+    async getPosition(@Req() req) {
+        const userId = req.session.passport.user;
+
+        return await firstValueFrom(
+            this.userClient.send('get.position', {
+                userId: Number(userId),
+            }),
+        );
+    }
 }

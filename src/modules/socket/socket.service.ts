@@ -320,8 +320,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         }[],
         @ConnectedSocket() client: Socket,
     ) {
-        
-
         const groupedMessages = dto.reduce(
             (acc, curr) => {
                 acc[curr.friend_id] = acc[curr.friend_id] || [];
@@ -363,8 +361,27 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     async saveGeolocation(
         @MessageBody() dto: [number, number],
         @ConnectedSocket() client: Socket,
-        @SocketUser() user: number
+        @SocketUser() user: number,
     ) {
+        const friendsIds = await firstValueFrom<number[]>(
+            this.friendClient.send('get.friends.ids', {
+                userId: user,
+            }),
+        );
+
+        friendsIds.map((id) => {
+            const friendSocket = this.activeSockets.get(String(id));
+
+            if (friendSocket) {
+                friendSocket.emit('friend-geolocation', {
+                    friendId: user,
+                    position: dto,
+                });
+            } else {
+                console.log(`Friend ${id} is not connected`);
+            }
+        });
+
         await this.mapService.saveGeolocation(user, dto);
     }
 }

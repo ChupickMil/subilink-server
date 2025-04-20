@@ -53,7 +53,7 @@ async function bootstrap() {
             'http://192.168.31.179:3000',
         ],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-        credentials: true, // поддержка cookies
+        credentials: true, 
         exposedHeaders: ['Content-Disposition'],
     });
 

@@ -30,6 +30,7 @@ export class KafkaService {
         this.userClient.subscribeToResponseOf('delete.file.by.uuid');
         this.userClient.subscribeToResponseOf('new.views');
         this.userClient.subscribeToResponseOf('get.profile.user');
+        this.userClient.subscribeToResponseOf('get.position');
 
         this.visitClient.subscribeToResponseOf('new.visit');
         this.visitClient.subscribeToResponseOf('get.visits');
@@ -67,6 +68,7 @@ export class KafkaService {
         this.friendClient.subscribeToResponseOf('add.friend');
         this.friendClient.subscribeToResponseOf('accept.request');
         this.friendClient.subscribeToResponseOf('cancel.outgoing.request');
+        this.friendClient.subscribeToResponseOf('get.friends.ids');
 
         this.fileClient.subscribeToResponseOf('get.files.by.uuids');
         this.fileClient.subscribeToResponseOf('get.profile.files.by.userid');
