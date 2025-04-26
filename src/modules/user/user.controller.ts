@@ -39,10 +39,12 @@ import { UpdateDescriptionDto } from './dto/updateDescription'
 export class UserController {
     private userClient: ClientKafka;
     private fileClient: ClientKafka;
+    private friendClient: ClientKafka;
 
     constructor(private readonly kafkaService: KafkaService) {
         this.userClient = kafkaService.getUserClient();
         this.fileClient = kafkaService.getFileClient();
+        this.friendClient = kafkaService.getFriendClient();
     }
 
     @ApiResponse({ status: 200 })
@@ -388,6 +390,26 @@ export class UserController {
         return await firstValueFrom(
             this.userClient.send('get.position', {
                 userId: Number(userId),
+            }),
+        );
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('marker/:friendId')
+    async getMarkerUserId(@Req() req, @Param('friendId') friendId: number) {
+        const userId = req.session.passport.user;
+
+        const isFriend = await firstValueFrom(this.friendClient.send('get.is.friends', {
+            userId, friendId
+        }))
+
+        if(!isFriend) return
+
+        return await firstValueFrom(
+            this.userClient.send('get.marker.user', {
+                userId: Number(friendId),
             }),
         );
     }

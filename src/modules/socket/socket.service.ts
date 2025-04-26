@@ -384,4 +384,13 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
 
         await this.mapService.saveGeolocation(user, dto);
     }
+
+    @UseGuards(SocketAuthenticatedGuard)
+    @SubscribeMessage('save-shake')
+    async saveShake(
+        @ConnectedSocket() client: Socket,
+        @SocketUser() user: number,
+    ) {
+        await this.redis.set(`shake:user:${user}`, true, 1000)
+    }
 }

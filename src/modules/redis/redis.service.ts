@@ -17,6 +17,10 @@ export class RedisService {
 
         this.client = createClient({
             url: `redis://:${password}@${host}:${port}`,
+            socket: {
+                keepAlive: 10000,
+                connectTimeout: 5000
+            }
         });
         this.client.connect().catch(console.error);
     }

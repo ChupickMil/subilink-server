@@ -102,4 +102,18 @@ export class FriendController {
             }),
         );
     }
+
+    @ApiResponse({ status: 200 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('positions')
+    async getPositions(@Req() req) {
+        const userId = req.session.passport.user;
+
+        return await firstValueFrom(
+            this.friendClient.send('get.positions', {
+                userId,
+            }),
+        );
+    }
 }
