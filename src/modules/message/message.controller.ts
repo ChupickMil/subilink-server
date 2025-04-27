@@ -13,25 +13,20 @@ import {
     UseGuards,
     UseInterceptors,
 } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import * as fs from 'fs'
 import * as fsPromise from 'fs/promises'
 import { memoryStorage } from 'multer'
 import * as path from 'path'
-import { firstValueFrom, timeout } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
-import { KafkaService } from '../kafka/kafka.service'
+import { MessageService } from './message.service'
 
 @Controller('messages')
 export class MessageController {
-    private messagesClient: ClientKafka;
-
-    constructor(private readonly kafkaService: KafkaService) {
-        this.messagesClient = this.kafkaService.getMessageClient();
+    constructor(private readonly messageService: MessageService) {
     }
 
     @ApiResponse({ status: 201 })
@@ -46,14 +41,7 @@ export class MessageController {
         const senderId = query.senderId;
         const param = query.param;
 
-        return await firstValueFrom(
-            this.messagesClient.send('get.messages', {
-                userId,
-                senderId,
-                param,
-            }),
-        );
-        // return await this.messagesService.getPublicMessages(userId, senderId, param);
+        return await this.messageService.getPublicMessages(userId, senderId, param)
     }
 
     @ApiResponse({ status: 201 })
@@ -65,18 +53,12 @@ export class MessageController {
         @Query() query: { ids: string; for_everyone: ModalButtonAnswers },
     ) {
         const userId = req.session.passport.user;
-        const ids = query.ids.split(',');
+        const ids = query.ids.split(',').map(Number);
         const forEveryone = query.for_everyone;
 
-        return await firstValueFrom(
-            this.messagesClient
-                .send('delete.messages', {
-                    ids,
-                    forEveryone,
-                    userId,
-                })
-                .pipe(timeout(2000)),
-        );
+        return await this.messageService.deleteMessages(
+            ids, forEveryone, userId
+        )
     }
 
     @ApiResponse({ status: 201 })
@@ -91,13 +73,7 @@ export class MessageController {
         const senderId = query.senderId;
         const search = query.search;
 
-        return await firstValueFrom(
-            this.messagesClient.send('get.messages.search', {
-                userId,
-                senderId,
-                search,
-            }),
-        );
+        return await this.messageService.getPublicMessages(userId, senderId, null, search)
     }
 
     @ApiResponse({ status: 201 })
@@ -149,11 +125,7 @@ export class MessageController {
             };
         }));
 
-        await firstValueFrom(
-            this.messagesClient.send('save.messages.file', {
-                filesToDb
-            }),
-        );
+        await this.messageService.saveFile(filesToDb)
     }
 
     @ApiResponse({ status: 201 })
@@ -165,12 +137,7 @@ export class MessageController {
 
         if (!userId) return;
 
-        const data = await firstValueFrom(
-            this.messagesClient.send('get.messages.image', {
-                uuid,
-                userId,
-            }),
-        );
+        const data = await this.messageService.getImage(uuid, userId)
 
         if (!data) return;
         res.setHeader('Content-Type', data.mime_type);
@@ -189,12 +156,7 @@ export class MessageController {
     async downloadFile(@Req() req, @Param('uuid') uuid: string, @Res() res) {
         const userId = req.session.passport.user;
 
-        const data = await firstValueFrom(
-            this.messagesClient.send('get.messages.file', {
-                uuid,
-                userId,
-            }),
-        );
+        const data = await this.messageService.getFileForDownload(uuid, userId)
 
         if (!data) return res.status(404).send('File not found');
 

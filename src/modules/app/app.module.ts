@@ -5,8 +5,8 @@ import { PassportModule } from '@nestjs/passport'
 // import { TrackVisitMiddleware } from 'src/middlewares/TrackVisitMiddleware'
 import configurations from '../../configuration'
 import { ChatModule } from '../chat/chat.module'
+import { FileModule } from '../file/file.module'
 import { FriendModule } from '../friend/friend.module'
-import { KafkaModule } from '../kafka/kafka.module'
 import { MessageModule } from '../message/message.module'
 import { SocketModule } from '../socket/socket.module'
 import { UserModule } from '../user/user.module'
@@ -23,7 +23,7 @@ import { VisitModule } from '../visit/visit.module'
         VisitModule,
         UserModule,
         ChatModule,
-        KafkaModule,
+        FileModule,
         MessageModule,
         SocketModule,
         PassportModule.register({

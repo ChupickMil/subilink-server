@@ -1,21 +1,20 @@
 import { AuthModule } from '@auth/auth.module'
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
-import { KafkaModule } from '../kafka/kafka.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { RedisModule } from '../redis/redis.module'
 import { VisitController } from './visit.controller'
+import { VisitService } from './visit.service'
 
 @Module({
     imports: [
         PrismaModule,
-        AuthModule,
         RedisModule,
-        KafkaModule
+        forwardRef(() => AuthModule)
     ],
     controllers: [VisitController],
-    providers: [AuthenticatedGuard, TwoFAGuard],
-    exports: [],
+    providers: [AuthenticatedGuard, TwoFAGuard, VisitService],
+    exports: [VisitService],
 })
 export class VisitModule {}

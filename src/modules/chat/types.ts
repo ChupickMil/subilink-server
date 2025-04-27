@@ -2,14 +2,15 @@ import { Prisma } from '@prisma/client'
 
 interface IFilteredChat {
     lastMessage: string;
-    sender_id: number;
+    sender_id: string | number;
     lastMessageTime: string;
-    user:
-        | {
-              id: number;
-              name: string | null;
-          }
-        | undefined;
+    read_at: Date | null;
+    fileUuidsLength: number;
+    countUnreadMessages: number;
+    user: {
+        id: number;
+        name: string;
+    } | undefined;
 }
 
 type ChatWithRelations = Prisma.ChatGetPayload<{
@@ -44,5 +45,24 @@ type ChatWithRelations = Prisma.ChatGetPayload<{
     };
 }>;
 
-export type { ChatWithRelations, IFilteredChat }
+interface IChats {
+    message: {
+        sender_id: number;
+        chat_id: number;
+        read_at: Date;
+        content: string;
+        created_at: Date;
+        file_ids: string[];
+    }[];
+    first_user: {
+        id: number;
+        name: string;
+    };
+    second_user: {
+        id: number;
+        name: string;
+    };
+}
+
+export type { ChatWithRelations, IChats, IFilteredChat }
 

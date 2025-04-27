@@ -1,5 +1,4 @@
 import { Injectable, UseGuards } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import {
     ConnectedSocket,
     MessageBody,
@@ -8,38 +7,32 @@ import {
     SubscribeMessage,
     WebSocketGateway,
 } from '@nestjs/websockets'
-import { firstValueFrom } from 'rxjs'
 import { Socket } from 'socket.io'
 import { SocketUser } from 'src/common/decorators/UserSocket.decorator'
 import { SocketAuthenticatedGuard } from 'src/common/guards/SocketAuthenticatedGuard'
-import { KafkaService } from '../kafka/kafka.service'
-import { MapService } from '../map/map.service'
+import { ChatService } from '../chat/chat.service'
+import { FriendService } from '../friend/friend.service'
+import { MessageService } from '../message/message.service'
 import { RedisService } from '../redis/redis.service'
+import { UserService } from '../user/user.service'
+import { MapService } from './../map/map.service'
 import { IChatMessageDto, IFriendsRequestDto } from './types'
 
 @Injectable()
 @WebSocketGateway({
     cors: {
-        // origin: 'http://localhost:3000', // точный домен
         origin: ['http://192.168.31.179:3000', 'http://localhost:3000'], // точный домен
     },
 })
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
-    private friendClient: ClientKafka;
-    private chatClient: ClientKafka;
-    private messageClient: ClientKafka;
-    private userClient: ClientKafka;
-
     constructor(
-        private readonly kafkaService: KafkaService,
-        private readonly mapService: MapService,
-        private readonly redis: RedisService,
-    ) {
-        this.friendClient = this.kafkaService.getFriendClient();
-        this.chatClient = this.kafkaService.getChatClient();
-        this.messageClient = this.kafkaService.getMessageClient();
-        this.userClient = this.kafkaService.getUserClient();
-    }
+        private readonly chatService: ChatService,
+        private readonly userService: UserService,
+        private readonly messageService: MessageService,
+        private readonly friendService: FriendService,
+        private readonly mapService: MapService ,
+        private readonly redis: RedisService
+    ) {}
 
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
 
@@ -73,66 +66,47 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         const { userId, recipientId, content, fileUuids, replyMessageId } = dto;
 
         // Проверяем существование чата или создаем новый
-        const isHasChat = JSON.parse(
-            await firstValueFrom(
-                this.chatClient.send('get.is.has.chat', {
-                    userId,
-                    recipientId,
-                }),
-            ),
+        const isHasChat = await this.chatService.getIsHasChat(
+            userId,
+            recipientId,
         );
 
-        const isDeletedChat = JSON.parse(
-            await firstValueFrom(
-                this.chatClient.send('get.is.deleted.chat', {
-                    userId,
-                    recipientId,
-                }),
-            ),
+        const isDeletedChat = await this.chatService.getIsDeletedChat(
+            userId,
+            recipientId,
         );
 
         if (isDeletedChat) {
-            await firstValueFrom(
-                this.chatClient.send('recovery.chat', { userId, recipientId }),
-            );
+            await this.chatService.recoveryChat(userId, recipientId);
         }
 
         if (!isHasChat) {
-            console.log(123);
-            const isCreated = await firstValueFrom(
-                this.chatClient.send('create.chat', { userId, recipientId }),
+            const isCreated = await this.chatService.createChat(
+                userId,
+                recipientId,
             );
             if (!isCreated) throw new Error('Failed to create chat');
         }
 
         // Получаем ID чата
-        const chatId = String(
-            await firstValueFrom(
-                this.chatClient.send('get.chat.id', {
-                    userId,
-                    recipientId,
-                }),
-            ),
-        );
+        const chatId = await this.chatService.getChatId(userId, recipientId);
 
         if (!chatId) throw new Error('Chat not found');
 
         // Отправляем сообщение
-        const result = await firstValueFrom(
-            this.messageClient.send('send.new.message', {
-                userId,
-                chatId,
-                content,
-                fileUuids,
-                replyMessageId,
-            }),
+        const result = await this.messageService.sendNewMessageChat(
+            Number(userId),
+            chatId,
+            content,
+            replyMessageId,
+            fileUuids,
         );
 
-        const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', {
-                userId,
-                select: { name: true },
-            }),
+        const senderName = await this.userService.getUserWithSelect(
+            Number(userId),
+            {
+                name: true,
+            },
         );
 
         // Уведомляем отправителя
@@ -141,7 +115,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(recipientId));
 
-        if (friendSocket) {
+        if (friendSocket && senderName) {
             // Уведомляем друга
             friendSocket.emit('messages-notification', {
                 ...result,
@@ -161,24 +135,14 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // записываем в бд
-        await firstValueFrom(
-            this.friendClient.send('add.friend', {
-                userId: dto.userId,
-                friendId: dto.friendId,
-            }),
-        );
+        await this.friendService.addFriend(dto.userId, dto.friendId)
 
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
-        const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', {
-                userId: dto.userId,
-                select: { name: true },
-            }),
-        );
+        const senderName = await this.userService.getUserWithSelect(Number(dto.userId), { name: true })
 
-        if (friendSocket) {
+        if (friendSocket && senderName) {
             // Уведомляем друга
             friendSocket.emit('friends-request-notification', {
                 message: `Новый запрос в друзья от пользователя ${dto.userId}`,
@@ -202,24 +166,14 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await firstValueFrom(
-            this.friendClient.send('accept.request', {
-                userId: dto.userId,
-                friendId: dto.friendId,
-            }),
-        );
+        await this.friendService.acceptRequest(dto.userId, dto.friendId)
 
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
-        const senderName = await firstValueFrom<{ name: string }>(
-            this.userClient.send('get.user.with.select', {
-                userId: dto.userId,
-                select: { name: true },
-            }),
-        );
+        const senderName = await this.userService.getUserWithSelect(Number(dto.userId), { name: true })
 
-        if (friendSocket) {
+        if (friendSocket && senderName) {
             // Уведомляем друга
             friendSocket.emit('friends-request-accept-notification', {
                 message: `Ваш запрос принял ${dto.userId}`,
@@ -243,12 +197,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await firstValueFrom(
-            this.friendClient.send('cancel.outgoing.request', {
-                userId: dto.userId,
-                friendId: dto.friendId,
-            }),
-        );
+        await this.friendService.cancelOutgoingRequest(dto.userId, dto.friendId)
 
         // Подтверждаем действие инициатору
         client.emit('friends-cancel-outgoing-request', { success: true });
@@ -350,10 +299,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             });
         }
 
-        await firstValueFrom(
-            this.messageClient.send('update.message.status', dto),
-        );
-        // await this.messageService.updateMessageRead(dto);
+        await this.messageService.updateMessageStatus(dto)
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -363,11 +309,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
         @SocketUser() user: number,
     ) {
-        const friendsIds = await firstValueFrom<number[]>(
-            this.friendClient.send('get.friends.ids', {
-                userId: user,
-            }),
-        );
+        const friendsIds = await this.friendService.getFriendIds(user)
 
         friendsIds.map((id) => {
             const friendSocket = this.activeSockets.get(String(id));
@@ -391,6 +333,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
         @SocketUser() user: number,
     ) {
-        await this.redis.set(`shake:user:${user}`, true, 1000)
+        await this.redis.set(`shake:user:${user}`, true, 1000);
     }
 }

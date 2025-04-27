@@ -1,42 +1,29 @@
 import { Injectable } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices'
 import * as bcrypt from 'bcrypt'
 import * as qrcode from 'qrcode'
-import { firstValueFrom } from 'rxjs'
 import * as speakeasy from 'speakeasy'
 import { AUTH } from 'src/common/messages'
-import { KafkaService } from '../kafka/kafka.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
+import { UserService } from '../user/user.service'
+import { VisitService } from '../visit/visit.service'
 import { LoginUserDto, RegisterUserDto } from './dto'
-import { IUser } from './interfaces/IUser.interface'
 
 @Injectable()
 export class AuthService {
-    private userClient: ClientKafka;
-    private visitClient: ClientKafka;
-
     constructor(
         private readonly redis: RedisService,
         private readonly prisma: PrismaService,
-        private readonly kafkaService: KafkaService,
-    ) {
-        this.userClient = this.kafkaService.getUserClient();
-        this.visitClient = this.kafkaService.getVisitClient();
-    }
+        private readonly userService: UserService,
+        private readonly visitService: VisitService,
+    ) {}
 
     async register(user: RegisterUserDto) {
         try {
-            const isHaveUser = await firstValueFrom<boolean>(
-                this.userClient.send('find.user', {
-                    data: user.phone,
-                    type: 'phone',
-                }),
+            const isHaveUser = await this.userService.findUser(
+                user.phone,
+                'phone',
             );
-            // const isHaveUser = await this.userService.findUser(
-            //     user.phone,
-            //     'phone',
-            // );
 
             if (isHaveUser) return { message: 'User already registered' };
 
@@ -45,8 +32,7 @@ export class AuthService {
                 name: user.name,
             };
 
-            this.userClient.send('create.user', newUser);
-            // await this.userService.createUser(newUser);
+            await this.userService.createUser(newUser);
 
             return { message: 'User is registered' };
         } catch (err) {
@@ -57,29 +43,17 @@ export class AuthService {
     async login(user: LoginUserDto) {}
 
     async logoutBySessionId(sessionId: string) {
-        const visit = await firstValueFrom(
-            this.visitClient.send('find.visit.by.sessionid', {
-                value: sessionId,
-                select: {
-                    id: true,
-                },
-            }),
-        );
+        const visit = await this.visitService.findVisit(sessionId, {
+            id: true,
+        });
 
         if (!visit) return;
 
-        return await firstValueFrom(
-            this.visitClient.send('logout.visit', { value: sessionId }),
-        );
+        return await this.visitService.logout(sessionId);
     }
 
     async isValidatedUser(phone: string, password: string) {
-        const user = await firstValueFrom<IUser>(
-            this.userClient.send('find.user', {
-                data: phone,
-                type: 'phone',
-            }),
-        );
+        const user = await this.userService.findUser(phone, 'phone');
 
         if (!user) {
             return false;
@@ -89,15 +63,11 @@ export class AuthService {
     }
 
     public async isUserExist(phone: string): Promise<boolean> {
-        return !!(await firstValueFrom(
-            this.userClient.send('find.user', { data: phone, type: 'phone' }),
-        ));
+        return !!(await this.userService.findUser(phone, 'phone'));
     }
 
     public async isUserReg(phone: string): Promise<boolean> {
-        return !!(await firstValueFrom(
-            this.userClient.send('get.name', { phone }),
-        ));
+        return !!(await this.userService.getName(phone));
     }
 
     async sendVerificationCode(phone: string): Promise<void> {
@@ -134,15 +104,10 @@ export class AuthService {
             return null;
         }
 
-        const user = await firstValueFrom(
-            this.userClient.send('find.user', { data: phone, type: 'phone' }),
-        );
+        const user = await this.userService.findUser(phone, 'phone');
 
         if (!user) {
-            const user = await firstValueFrom(
-                this.userClient.send('create.user', { phone }),
-            );
-            return user;
+            return await this.userService.createUser({ phone });
         }
 
         return user;
@@ -155,14 +120,10 @@ export class AuthService {
         let user_id: number;
 
         if (type === 'phone') {
-            const user = await firstValueFrom(
-                this.userClient.send('find.user', {
-                    data: value.toString(),
-                    type: 'phone',
-                    select: {
-                        id: true,
-                    },
-                }),
+            const user = await this.userService.findUserSelect(
+                value.toString(),
+                'phone',
+                { id: true },
             );
 
             if (!user) {
@@ -192,27 +153,12 @@ export class AuthService {
     async generate2FA(phone: string) {
         try {
             const secret = speakeasy.generateSecret({
-                name: `Subilink (${phone})`,
+                name: `Sabilink (${phone})`,
             });
 
-            const user = await firstValueFrom(
-                this.userClient.send('find.user', {
-                    data: phone,
-                    type: 'phone',
-                    select: {
-                        id: true,
-                    },
-                }),
-            );
-
-            // const user = await this.prisma.user.findUnique({
-            //     where: {
-            //         phone,
-            //     },
-            //     select: {
-            //         id: true,
-            //     },
-            // });
+            const user = await this.userService.findUserSelect(phone, 'phone', {
+                id: true,
+            });
 
             if (!user?.id) return { message: 'Not exists user' };
 
@@ -232,7 +178,7 @@ export class AuthService {
                     },
                 });
             } else {
-                const res = await this.prisma.twoFA.create({
+                await this.prisma.twoFA.create({
                     data: {
                         user_id: user.id,
                         autentificator_code: secret.base32,
@@ -307,7 +253,7 @@ export class AuthService {
     }
 
     public async updateLastVisit(userId: string) {
-        this.visitClient.emit('update.last.visit', { userId });
+        await this.userService.updateLastVisit(userId);
     }
 
     public async newVisit(
@@ -316,13 +262,6 @@ export class AuthService {
         ip: string | undefined,
         userAgent: string | undefined,
     ) {
-        return await firstValueFrom(
-            this.visitClient.emit('new.visit', {
-                id,
-                sessionId,
-                ip,
-                userAgent,
-            }),
-        );
+        return await this.visitService.newVisit(id, sessionId, ip, userAgent);
     }
 }

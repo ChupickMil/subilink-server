@@ -1,23 +1,21 @@
 import {
     Controller,
     Get,
-    Inject,
     Param,
     Query,
     Req,
     Res,
-    UseGuards,
+    UseGuards
 } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices'
 import { ApiResponse } from '@nestjs/swagger'
-import { firstValueFrom } from 'rxjs'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
+import { VisitService } from './visit.service'
 
 @Controller('visits')
 export class VisitController {
     constructor(
-        @Inject('VISIT_SERVICE') private readonly client: ClientKafka,
+        private readonly visitService: VisitService
     ) {}
 
     @ApiResponse({ status: 200 })
@@ -27,9 +25,7 @@ export class VisitController {
         const userId = req.session.passport.user;
         const sessionId = req.sessionID.split('.')[0];
 
-        return await firstValueFrom(
-            this.client.send('get.visits', { sessionId, userId }),
-        );
+        return await this.visitService.getVisits(sessionId, userId)
     }
 
     @ApiResponse({ status: 200 })
@@ -38,12 +34,7 @@ export class VisitController {
     async logoutVisit(@Req() req, @Query() query: { id: string }) {
         const userId = req.session.passport.user;
         
-        return await firstValueFrom(
-            this.client.emit('logout.by.id', {
-                id: query.id,
-                userId,
-            }),
-        );
+        return await this.visitService.logoutById(query.id, userId)
     }
 
     @ApiResponse({ status: 200 })
@@ -52,9 +43,7 @@ export class VisitController {
     async getDateVisits(@Req() req, @Param('user_id') userIdParam?: string) { 
         const userId = userIdParam ?? req.session.passport.user;
 
-        return await firstValueFrom(
-            this.client.send('get.date.visits', { userId }),
-        );
+        return await this.visitService.getDateVisits(userId)
     }
 
     @ApiResponse({ status: 200 })
@@ -66,14 +55,8 @@ export class VisitController {
         const ip = req.ip;
         const userAgent = req.headers['user-agent'];
 
-        await firstValueFrom(
-            this.client.send('new.visit', {
-                userId,
-                sessionId,
-                ip,
-                userAgent,
-            }),
-        );
+        await this.visitService.newVisit(userId, sessionId, ip, userAgent)
+
         return true;
     }
 }

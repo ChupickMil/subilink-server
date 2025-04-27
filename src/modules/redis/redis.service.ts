@@ -29,6 +29,10 @@ export class RedisService {
         return this.client;
     }
 
+    async getGeo(userId: number) {
+		return await this.client.geoPos("user:locations", `user:${userId}`);
+	}
+
     async set(key: string, value: any, ttl: number): Promise<void> {
         try {
             await this.cacheManager.set(key, value, ttl);

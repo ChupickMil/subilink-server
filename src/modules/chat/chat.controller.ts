@@ -10,26 +10,21 @@ import {
     UseGuards,
     UseInterceptors
 } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices'
 import { ApiResponse } from '@nestjs/swagger'
 import { Response } from 'express'
-import { firstValueFrom } from 'rxjs'
 import { ModalButtonAnswers } from 'src/common/@types/types'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
-import { KafkaService } from '../kafka/kafka.service'
+import { ChatService } from './chat.service'
 import { ChatInfoDto } from './dto/ChatInfo.dto'
 import { FilteredChatDto } from './dto/FilteredChat.dto'
 
 @Controller('chats')
 export class ChatController {
-    private chatClient: ClientKafka
-
     constructor(
-        private readonly kafkaService: KafkaService
+        private readonly chatService: ChatService
     ) {
-        this.chatClient = this.kafkaService.getChatClient()
     }
 
     @ApiResponse({ status: 200, type: FilteredChatDto })
@@ -41,9 +36,7 @@ export class ChatController {
         const userId = req.session.passport.user;
         const search = query.search;
 
-        return await firstValueFrom(
-            this.chatClient.send('get.chats', { userId, search }),
-        );
+        return await this.chatService.getChats(userId, search)
     }
 
     @ApiResponse({ status: 200, type: ChatInfoDto })
@@ -61,9 +54,8 @@ export class ChatController {
         const recipientId = query.chatId;
         if (!recipientId) return res.status(HttpStatus.BAD_REQUEST);
 
-        const result = await firstValueFrom(
-            this.chatClient.send('get.chat.info', { recipientId }),
-        );
+        const result = await this.chatService.getChatInfo(recipientId)
+
         res.send(result);
     }
 
@@ -79,9 +71,7 @@ export class ChatController {
         const ids = query.ids.split(',');
         const for_everyone = query.for_everyone;
 
-        await firstValueFrom(
-            this.chatClient.emit('delete.chats', { ids, userId, for_everyone }),
-        );
+        return await this.chatService.deleteChats(ids, userId, for_everyone)
     }
 
     @ApiResponse({ status: 201 })
@@ -94,11 +84,6 @@ export class ChatController {
     ) {
         const userId = req.session.passport.user;
 
-        return await firstValueFrom(
-            this.chatClient.send('get.count.unread.messages', {
-                userId,
-                recipientId: query.chatId,
-            }),
-        );
+        return await this.chatService.getCountUnreadMessages(userId, Number(query.chatId))
     }
 }

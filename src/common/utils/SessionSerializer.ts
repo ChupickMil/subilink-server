@@ -1,22 +1,17 @@
 import { Injectable } from '@nestjs/common/decorators/core/injectable.decorator'
-import { ClientKafka } from '@nestjs/microservices/client/client-kafka'
 import { PassportSerializer } from '@nestjs/passport'
 import { User } from '@prisma/client'
-import { firstValueFrom } from 'rxjs'
-import { KafkaService } from 'src/modules/kafka/kafka.service'
+import { UserService } from 'src/modules/user/user.service'
 
 @Injectable()
 export class SessionSerializer extends PassportSerializer {
-    private userClient: ClientKafka
-    
     constructor(
-        private readonly kafkaService: KafkaService
+        private readonly userService: UserService
     ) {
         super();
     }
     
     public onApplicationBootstrap() {
-        this.userClient = this.kafkaService.getUserClient();
     }
 
     serializeUser(user: User, done: (err, user) => void) {
@@ -24,11 +19,9 @@ export class SessionSerializer extends PassportSerializer {
         done(null, user.id);
     }
 
-    async deserializeUser(user: User, done: (err, user) => void) {
+    async deserializeUser(user: number, done: (err, user) => void) {
         console.log('Deserialize user ', user);
-        const userDB = await firstValueFrom(
-            this.userClient.send('find.user', { data: user, type: 'id' }),
-        );
+        const userDB = await this.userService.findUser(Number(user), 'id')
         return userDB ? done(null, userDB) : done(null, null);
     }
 }

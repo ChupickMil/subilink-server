@@ -16,7 +16,6 @@ import {
     UseGuards,
     UseInterceptors,
 } from '@nestjs/common'
-import { ClientKafka } from '@nestjs/microservices'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { ApiConsumes, ApiResponse } from '@nestjs/swagger'
 import { isArray } from 'class-validator'
@@ -25,27 +24,18 @@ import * as fs from 'fs'
 import * as fsPromise from 'fs/promises'
 import { memoryStorage } from 'multer'
 import * as path from 'path'
-import { firstValueFrom } from 'rxjs'
 import { ALLOWED_IMAGE_MIME_TYPE } from 'src/common/constants/imageExtension'
 import { AuthenticatedGuard } from 'src/common/guards/AuthenticatedGuard'
 import { TwoFAGuard } from 'src/common/guards/TwoFaGuard'
 import { TrackVisitInterceptor } from 'src/interceptors/TrackVisitInterceptor'
-import { KafkaService } from '../kafka/kafka.service'
 import { UpdateNameDto } from './dto'
 import { GlobalUsers } from './dto/globalUser.dto'
 import { UpdateDescriptionDto } from './dto/updateDescription'
+import { UserService } from './user.service'
 
 @Controller('users')
 export class UserController {
-    private userClient: ClientKafka;
-    private fileClient: ClientKafka;
-    private friendClient: ClientKafka;
-
-    constructor(private readonly kafkaService: KafkaService) {
-        this.userClient = kafkaService.getUserClient();
-        this.fileClient = kafkaService.getFileClient();
-        this.friendClient = kafkaService.getFriendClient();
-    }
+    constructor(private readonly userService: UserService) {}
 
     @ApiResponse({ status: 200 })
     @UseGuards(AuthenticatedGuard, TwoFAGuard)
@@ -54,7 +44,7 @@ export class UserController {
         const userId = req.session.passport.user;
         const id = query.id ?? userId;
 
-        return await firstValueFrom(this.userClient.send('get.user', id));
+        return await this.userService.publicUser(id, 'id', true, true, true);
     }
 
     @ApiResponse({ status: 200 })
@@ -66,16 +56,10 @@ export class UserController {
         const id = query.id ?? userId;
 
         if (Number(userId) !== Number(id)) {
-            this.userClient.emit('new.views', {
-                userId,
-                profileId: id,
-            });
+            await this.userService.newViews(userId, Number(id));
         }
-        return await firstValueFrom(
-            this.userClient.send('get.profile.user', {
-                userId: id,
-            }),
-        );
+
+        return await this.userService.getProfileUser(Number(id));
     }
 
     @ApiResponse({ status: 200, type: UpdateNameDto })
@@ -88,14 +72,9 @@ export class UserController {
     ) {
         const userId = req.session.passport.user;
 
-        const answer = await firstValueFrom<{ isSuccess: boolean }>(
-            this.userClient.send('update.user', {
-                userId,
-                name: user.name,
-            }),
-        );
+        const answer = await this.userService.updateUser(userId, user);
 
-        return answer.isSuccess
+        return answer
             ? res.status(HttpStatus.OK).json({ success: true })
             : res.status(HttpStatus.BAD_REQUEST).json({ success: false });
     }
@@ -110,14 +89,9 @@ export class UserController {
     ) {
         const userId = req.session.passport.user;
 
-        const answer = await firstValueFrom<{ isSuccess: boolean }>(
-            this.userClient.send('update.user', {
-                userId,
-                description: user.description,
-            }),
-        );
+        const answer = await this.userService.updateUser(userId, user);
 
-        return answer.isSuccess
+        return answer
             ? res.status(HttpStatus.OK).json({ success: true })
             : res.status(HttpStatus.BAD_REQUEST).json({ success: false });
     }
@@ -129,7 +103,7 @@ export class UserController {
         const userId = req.session.passport.user;
         const search = query.search;
 
-        return this.userClient.send('get.global.users', { userId, search });
+        return await this.userService.getGlobalUsers(userId, search);
     }
 
     @ApiResponse({ status: 201 })
@@ -157,7 +131,7 @@ export class UserController {
         @UploadedFiles() files: Express.Multer.File[],
     ) {
         const userId = req.session.passport.user;
-        const uuid = req.body.uuid;
+        const uuid = req.body.uuid as string;
         const userDir = path.join('uploads', String(userId));
 
         try {
@@ -191,11 +165,7 @@ export class UserController {
             user_id: Number(userId),
         };
 
-        await firstValueFrom(
-            this.userClient.send('update.avatar.file', {
-                avatar,
-            }),
-        );
+        await this.userService.saveAvatar(avatar);
 
         return true;
     }
@@ -207,7 +177,7 @@ export class UserController {
         const userId = req.session.passport.user;
         const uuid = body.uuid;
 
-        return this.userClient.send('update.avatar.by.uuid', { userId, uuid });
+        return await this.userService.updateAvatarByUuid(userId, uuid);
     }
 
     @ApiResponse({ status: 200, type: GlobalUsers })
@@ -216,9 +186,7 @@ export class UserController {
     async deletePhoto(@Req() req, @Param('uuid') uuid: string) {
         const userId = req.session.passport.user;
 
-        const deletedFile = await firstValueFrom(
-            this.userClient.send('delete.file.by.uuid', { userId, uuid }),
-        );
+        const deletedFile = await this.userService.deleteFileById(userId, uuid);
 
         await fsPromise
             .access(deletedFile.path)
@@ -235,17 +203,30 @@ export class UserController {
     @HttpCode(HttpStatus.OK)
     @Get('avatar/:uuid')
     async getImageByUuid(@Req() req, @Param('uuid') uuid: string, @Res() res) {
-        const userId = req.session.passport.user;
+        const userId = req.session.passport.user as number;
 
-        const data = await firstValueFrom(
-            this.userClient.send('get.profile.image.by.uuid', {
-                uuid,
-                userId,
-            }),
-        );
+        const data = await this.userService.getImageByUuid(uuid, userId);
 
         if (!data) {
-            return res.status(HttpStatus.NOT_FOUND).send('Image not found');
+            const defaultData = await this.userService.getImageByUuid(
+                'fd89eff8-eef0-4d71-b929-4999ae0a8fe2',
+                1,
+            );
+
+            if (!defaultData) {
+                return res.status(HttpStatus.NOT_FOUND).send('Image not found');
+            }
+
+            res.setHeader('Content-Type', defaultData.mime_type);
+            res.setHeader('Cache-Control', 'public, max-age=10800, immutable');
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${encodeURIComponent(defaultData.original_name)}"`,
+            );
+
+            fs.createReadStream(defaultData.path).pipe(res);
+
+            return;
         }
 
         res.setHeader('Content-Type', data.mime_type);
@@ -267,16 +248,14 @@ export class UserController {
         @Query('lastId') lastId: string,
         @Query('user_id') user_id?: string,
     ) {
-        const userId = user_id?.length ? user_id : req.session.passport.user;
+        const userId = user_id?.length
+            ? user_id
+            : (req.session.passport.user as number);
 
-        const files = await firstValueFrom(
-            this.fileClient.send('get.profile.files.by.userid', {
-                userId: Number(userId),
-                lastId: Number(lastId),
-            }),
+        return await this.userService.getProfileFilesByUserId(
+            Number(userId),
+            Number(lastId),
         );
-
-        return files;
     }
 
     @ApiResponse({ status: 201 })
@@ -294,14 +273,9 @@ export class UserController {
         if (!userId) return;
         if (!uuid) return;
 
-        const data = await firstValueFrom(
-            this.userClient.send('get.profile.photo', {
-                uuid,
-                userId,
-            }),
-        );
+        const data = await this.userService.getProfilePhoto(uuid, userId);
 
-        if (!data.mime_type) return;
+        if (!data || data instanceof Error || !data.mime_type) return;
 
         res.setHeader('Content-Type', data.mime_type);
         res.setHeader(
@@ -335,8 +309,8 @@ export class UserController {
     async addPhotos(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
         const userId = req.session.passport.user;
         const uuids = isArray(req.body.uuid)
-            ? req.body.uuid
-            : Array(req.body.uuid);
+            ? (req.body.uuid as string)
+            : (Array(req.body.uuid) as string[]);
         const userDir = path.join('uploads', String(userId));
 
         files.forEach(async (file, i) => {
@@ -371,11 +345,7 @@ export class UserController {
                 user_id: Number(userId),
             };
 
-            await firstValueFrom(
-                this.userClient.send('add.profile.photos', {
-                    file: fileForDb,
-                }),
-            );
+            await this.userService.addProfilePhotos(fileForDb);
         });
 
         return true;
@@ -388,11 +358,7 @@ export class UserController {
     async getPosition(@Req() req) {
         const userId = req.session.passport.user;
 
-        return await firstValueFrom(
-            this.userClient.send('get.position', {
-                userId: Number(userId),
-            }),
-        );
+        return await this.userService.getPosition(userId);
     }
 
     @ApiResponse({ status: 201 })
@@ -402,16 +368,16 @@ export class UserController {
     async getMarkerUserId(@Req() req, @Param('friendId') friendId: number) {
         const userId = req.session.passport.user;
 
-        const isFriend = await firstValueFrom(this.friendClient.send('get.is.friends', {
-            userId, friendId
-        }))
+        const isFriend = await this.userService.getIsFriends(userId, friendId);
 
-        if(!isFriend) return
+        if (!isFriend) return;
 
-        return await firstValueFrom(
-            this.userClient.send('get.marker.user', {
-                userId: Number(friendId),
-            }),
+        return await this.userService.publicUser(
+            friendId,
+            'id',
+            false,
+            false,
+            true,
         );
     }
 }
