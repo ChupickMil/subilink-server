@@ -249,6 +249,7 @@ export class UserController {
         }
 
         res.setHeader('Content-Type', data.mime_type);
+        res.setHeader('Cache-Control', 'public, max-age=10800, immutable');
         res.setHeader(
             'Content-Disposition',
             `inline; filename="${encodeURIComponent(data.original_name)}"`,
