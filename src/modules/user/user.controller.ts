@@ -207,30 +207,33 @@ export class UserController {
 
         const data = await this.userService.getImageByUuid(uuid, userId);
 
+        console.log(uuid);
+        console.log(data);
+
         if (!data) {
-            const defaultData = await this.userService.getImageByUuid(
-                'fd89eff8-eef0-4d71-b929-4999ae0a8fe2',
-                1,
-            );
+            // const defaultData = await this.userService.getImageByUuid(
+            //     'fd89eff8-eef0-4d71-b929-4999ae0a8fe2',
+            //     1,
+            // );
 
-            if (!defaultData) {
+            // if (!defaultData) {
                 return res.status(HttpStatus.NOT_FOUND).send('Image not found');
-            }
+            // }
 
-            res.setHeader('Content-Type', defaultData.mime_type);
-            res.setHeader('Cache-Control', 'public, max-age=10800, immutable');
-            res.setHeader(
-                'Content-Disposition',
-                `inline; filename="${encodeURIComponent(defaultData.original_name)}"`,
-            );
-
-            fs.createReadStream(defaultData.path).pipe(res);
-
-            return;
+            // res.setHeader('Content-Type', defaultData.mime_type);
+            // res.setHeader('Cache-Control', 'public, max-age=10800');
+            // res.setHeader(
+            //     'Content-Disposition',
+            //     `inline; filename="${encodeURIComponent(defaultData.original_name)}"`,
+            // );
+            //
+            // fs.createReadStream(defaultData.path).pipe(res);
+            //
+            // return;
         }
 
         res.setHeader('Content-Type', data.mime_type);
-        res.setHeader('Cache-Control', 'public, max-age=10800, immutable');
+        res.setHeader('Cache-Control', 'public, max-age=10800');
         res.setHeader(
             'Content-Disposition',
             `inline; filename="${encodeURIComponent(data.original_name)}"`,
@@ -359,6 +362,19 @@ export class UserController {
         const userId = req.session.passport.user;
 
         return await this.userService.getPosition(userId);
+    }
+
+    @ApiResponse({ status: 201 })
+    @UseGuards(AuthenticatedGuard, TwoFAGuard)
+    @HttpCode(HttpStatus.OK)
+    @Get('shake/:userId?')
+    async getShakes(@Req() req, @Param('userId') id: string) {
+        const userId = req.session.passport.user;
+        const newUserId = id ? Number(id) : userId
+        console.log(id)
+        console.log(userId)
+
+        return await this.userService.getShakes(newUserId);
     }
 
     @ApiResponse({ status: 201 })

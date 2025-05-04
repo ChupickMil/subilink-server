@@ -21,7 +21,12 @@ import { IChatMessageDto, IFriendsRequestDto } from './types'
 @Injectable()
 @WebSocketGateway({
     cors: {
-        origin: ['http://192.168.31.179:3000', 'http://localhost:3000'], // точный домен
+        origin: ['http://localhost:3000',
+            'https://localhost:3000',
+            'http://192.168.31.60:3000',
+            'https://192.168.31.60:3000',
+            'http://192.168.31.179:3000',
+            'https://192.168.31.179:3000'], // точный домен
     },
 })
 export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
@@ -30,8 +35,8 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         private readonly userService: UserService,
         private readonly messageService: MessageService,
         private readonly friendService: FriendService,
-        private readonly mapService: MapService ,
-        private readonly redis: RedisService
+        private readonly mapService: MapService,
+        private readonly redis: RedisService,
     ) {}
 
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
@@ -135,12 +140,15 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // записываем в бд
-        await this.friendService.addFriend(dto.userId, dto.friendId)
+        await this.friendService.addFriend(dto.userId, dto.friendId);
 
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
-        const senderName = await this.userService.getUserWithSelect(Number(dto.userId), { name: true })
+        const senderName = await this.userService.getUserWithSelect(
+            Number(dto.userId),
+            { name: true },
+        );
 
         if (friendSocket && senderName) {
             // Уведомляем друга
@@ -166,12 +174,15 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await this.friendService.acceptRequest(dto.userId, dto.friendId)
+        await this.friendService.acceptRequest(dto.userId, dto.friendId);
 
         // Получаем сокет друга
         const friendSocket = this.activeSockets.get(String(dto.friendId));
 
-        const senderName = await this.userService.getUserWithSelect(Number(dto.userId), { name: true })
+        const senderName = await this.userService.getUserWithSelect(
+            Number(dto.userId),
+            { name: true },
+        );
 
         if (friendSocket && senderName) {
             // Уведомляем друга
@@ -197,7 +208,10 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: any,
     ) {
         // обновляем бд
-        await this.friendService.cancelOutgoingRequest(dto.userId, dto.friendId)
+        await this.friendService.cancelOutgoingRequest(
+            dto.userId,
+            dto.friendId,
+        );
 
         // Подтверждаем действие инициатору
         client.emit('friends-cancel-outgoing-request', { success: true });
@@ -299,7 +313,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
             });
         }
 
-        await this.messageService.updateMessageStatus(dto)
+        await this.messageService.updateMessageStatus(dto);
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -309,7 +323,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
         @SocketUser() user: number,
     ) {
-        const friendsIds = await this.friendService.getFriendIds(user)
+        const friendsIds = await this.friendService.getFriendIds(user);
 
         friendsIds.map((id) => {
             const friendSocket = this.activeSockets.get(String(id));
@@ -319,8 +333,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                     friendId: user,
                     position: dto,
                 });
-            } else {
-                console.log(`Friend ${id} is not connected`);
             }
         });
 
@@ -328,11 +340,41 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('save-shake')
+    @SubscribeMessage('shake')
     async saveShake(
         @ConnectedSocket() client: Socket,
         @SocketUser() user: number,
     ) {
         await this.redis.set(`shake:user:${user}`, true, 1000);
+
+        const userGeo = await this.redis.getGeo(user);
+
+        if (!userGeo[0]) return;
+
+        const nearbyUsers = await this.redis.getGeoSearch(userGeo[0], 100);
+        const nearbyUsersIds = nearbyUsers.map(
+            (nearbyUser) =>
+                Number(nearbyUser.split(':')[1]) !== Number(user) ?
+                Number(nearbyUser.split(':')[1]) : null
+        ).filter(id => id && id);
+
+        const friendsIds = await this.friendService.getFriendIds(user);
+
+        friendsIds.map(async (id) => {
+            if(!nearbyUsersIds.includes(Number(id))) return
+
+            const friendSocket = this.activeSockets.get(String(id));
+
+            if (friendSocket) {
+                const isShake = await this.redis.get(`shake:user:${id}`);
+
+                if(isShake) {
+                    const res = await this.mapService.shake(user, id)
+                    if(!res) return
+
+                    client.emit("shake", res)
+                }
+            }
+        });
     }
 }

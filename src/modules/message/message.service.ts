@@ -397,7 +397,7 @@ export class MessageService {
         }
     }
 
-    private async getIsUserChatAccess(chatId: number, userId: number) {
+    private async getIsUserChatAccess(chatId: number, userId) {
         try {
             return !!(await this.chatService.checkUserChatAccess(
                 chatId,
@@ -460,11 +460,10 @@ export class MessageService {
         }
     }
 
-    async getFileForDownload(uuid: string, userId: string) {
+    async getFileForDownload(uuid: string) {
         return await this.prisma.file.findFirst({
             where: {
                 uuid: uuid,
-                user_id: Number(userId),
             },
             select: {
                 path: true,

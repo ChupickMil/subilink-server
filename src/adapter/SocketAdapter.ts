@@ -4,7 +4,12 @@ export class SocketIoAdapter extends IoAdapter {
   createIOServer(port: number, options?: any) {
     options = options || {};
     options.cors = {
-      origin: ['http://localhost:3000', 'http://192.168.31.60:3000', 'http://192.168.31.179:3000'],
+      origin: ['http://localhost:3000',
+            'https://localhost:3000',
+            'http://192.168.31.60:3000',
+            'https://192.168.31.60:3000',
+            'http://192.168.31.179:3000',
+            'https://192.168.31.179:3000',],
       methods: ['GET', 'POST'],
       credentials: true, 
     };

@@ -38,7 +38,7 @@ export class UserService {
     ): Promise<Prisma.UserGetPayload<{ select: T }> | null> {
         return this.prisma.user.findFirst({
             where: { [type]: value },
-            select, 
+            select,
         });
     }
 
@@ -229,6 +229,7 @@ export class UserService {
                 id: Number(userId),
             },
             select: {
+                id: true,
                 name: true,
                 avatar_uuid: true,
                 views: {
@@ -421,5 +422,20 @@ export class UserService {
 
     async getIsFriends(userId: number, friendId: number) {
         return await this.friendService.getIsFriends(userId, friendId);
+    }
+
+    async getShakes(userId: number) {
+        return await this.prisma.shake.count({
+            where: {
+                OR: [
+                    {
+                        first_user: userId,
+                    },
+                    {
+                        second_user: userId,
+                    },
+                ],
+            },
+        });
     }
 }

@@ -19,8 +19,8 @@ export class RedisService {
             url: `redis://:${password}@${host}:${port}`,
             socket: {
                 keepAlive: 10000,
-                connectTimeout: 5000
-            }
+                connectTimeout: 5000,
+            },
         });
         this.client.connect().catch(console.error);
     }
@@ -28,10 +28,6 @@ export class RedisService {
     async getClient(): Promise<RedisClientType> {
         return this.client;
     }
-
-    async getGeo(userId: number) {
-		return await this.client.geoPos("user:locations", `user:${userId}`);
-	}
 
     async set(key: string, value: any, ttl: number): Promise<void> {
         try {
@@ -41,12 +37,13 @@ export class RedisService {
         }
     }
 
-    async setGeo(
-        userId: number,
-        lngLat: [number, number],
-    ): Promise<void> {
+    async getGeo(userId: number) {
+        return await this.client.geoPos('user:locations', `user:${userId}`);
+    }
+
+    async setGeo(userId: number, lngLat: [number, number]): Promise<void> {
         try {
-            await this.client.geoAdd("user:locations", {
+            await this.client.geoAdd('user:locations', {
                 longitude: lngLat[0],
                 latitude: lngLat[1],
                 member: `user:${userId}`,
@@ -54,6 +51,16 @@ export class RedisService {
         } catch (err) {
             console.error('Redis GEOADD error:', err);
         }
+    }
+
+    async getGeoSearch(userGeo: { longitude: string; latitude: string }, radius: number) {
+        return await this.client.geoSearch('user:locations', {
+            longitude: userGeo.longitude,
+            latitude: userGeo.latitude,
+        }, {
+            radius,
+            unit: 'm',
+        });
     }
 
     async get<T>(key: string): Promise<T | undefined> {
@@ -76,20 +83,20 @@ export class RedisService {
 
     async getSession(sessionId: string): Promise<null | {
         cookie: {
-            originalMaxAge: number
-            expires: string
-            secure: boolean
-            httpOnly: boolean
-            path: string
-        },
+            originalMaxAge: number;
+            expires: string;
+            secure: boolean;
+            httpOnly: boolean;
+            path: string;
+        };
         passport: {
-            user: number
-        }
+            user: number;
+        };
     }> {
         const res = await this.client.get(sessionId);
 
-        if(!res) return null 
+        if (!res) return null;
 
-        return JSON.parse(res)
+        return JSON.parse(res);
     }
 }

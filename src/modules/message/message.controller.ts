@@ -154,9 +154,7 @@ export class MessageController {
     @HttpCode(HttpStatus.OK)
     @Get('file/:uuid')
     async downloadFile(@Req() req, @Param('uuid') uuid: string, @Res() res) {
-        const userId = req.session.passport.user;
-
-        const data = await this.messageService.getFileForDownload(uuid, userId)
+        const data = await this.messageService.getFileForDownload(uuid)
 
         if (!data) return res.status(404).send('File not found');
 

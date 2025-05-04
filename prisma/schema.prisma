@@ -53,6 +53,8 @@ model User {
   chatFirstUser    Chat[]            @relation("FirstUser")
   chatSecondUser   Chat[]            @relation("SecondUser")
   Visits           Visit[]
+  shakeFirstUser   Shake[]           @relation("first_user")
+  shakeSecondUser  Shake[]           @relation("second_user")
 
   @@map("user")
 }
@@ -197,4 +199,16 @@ model View {
   user User @relation(fields: [user_id], references: [id])
 
   @@map("view")
+}
+
+model Shake {
+  id          Int      @id @unique @default(autoincrement())
+  first_user  Int
+  second_user Int
+  created_at  DateTime @default(now()) @map("created_at")
+
+  user        User @relation("first_user", fields: [first_user], references: [id])
+  user_second User @relation("second_user", fields: [second_user], references: [id])
+
+  @@map("shake")
 }
