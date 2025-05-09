@@ -1,73 +1,241 @@
-import { Injectable, UseGuards } from '@nestjs/common'
-import {
-    ConnectedSocket,
-    MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    SubscribeMessage,
-    WebSocketGateway,
-} from '@nestjs/websockets'
+import { Injectable } from '@nestjs/common'
 import { Socket } from 'socket.io'
-import { SocketUser } from 'src/common/decorators/UserSocket.decorator'
-import { SocketAuthenticatedGuard } from 'src/common/guards/SocketAuthenticatedGuard'
 import { ChatService } from '../chat/chat.service'
 import { FriendService } from '../friend/friend.service'
+import { MapService } from '../map/map.service'
 import { MessageService } from '../message/message.service'
 import { RedisService } from '../redis/redis.service'
 import { UserService } from '../user/user.service'
-import { MapService } from './../map/map.service'
-import { IChatMessageDto, IFriendsRequestDto } from './types'
+import { IChatMessageDto, IFriendsRequestDto, IMessagesReadDto } from './types'
 
 @Injectable()
-@WebSocketGateway({
-    cors: {
-        origin: ['http://localhost:3000',
-            'https://localhost:3000',
-            'http://192.168.31.60:3000',
-            'https://192.168.31.60:3000',
-            'http://192.168.31.179:3000',
-            'https://192.168.31.179:3000'], // точный домен
-    },
-})
-export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
+export class SocketService {
     constructor(
-        private readonly chatService: ChatService,
-        private readonly userService: UserService,
-        private readonly messageService: MessageService,
         private readonly friendService: FriendService,
         private readonly mapService: MapService,
         private readonly redis: RedisService,
+        private readonly messageService: MessageService,
+        private readonly userService: UserService,
+        private readonly chatService: ChatService,
     ) {}
 
-    private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
-
-    handleConnection(client: any) {
-        // Пример: получаем userId из query параметров соединения
-        const userId = client.handshake.query.userId;
-        if (userId) {
-            this.activeSockets.set(userId, client); // Сохраняем сокет
-
-            console.log(`User connected: ${userId}`);
-        }
+    async getOnlineUsers(userIds: number[], activeSockets: Map<string, any>) {
+        return userIds.map((id: number) => {
+            return activeSockets.get(String(id));
+        });
     }
 
-    handleDisconnect(client: any) {
-        // Находим и удаляем сокет из хранилища
-        const userId = [...this.activeSockets.entries()].find(
-            ([_, socket]) => socket === client,
-        )?.[0];
-        if (userId) {
-            this.activeSockets.delete(userId);
-            console.log(`User disconnected: ${userId}`);
-        }
+    async cancelOutgoingRequest(userId: number, friendId: number) {
+        await this.friendService.cancelOutgoingRequest(userId, friendId);
     }
 
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('messages')
-    async handleEvent(
-        @MessageBody() dto: IChatMessageDto,
-        @ConnectedSocket() client: any,
+    async saveGeolocation(
+        user: number,
+        position: [number, number],
+        activeSockets: Map<string, any>,
     ) {
+        const friendsIds = await this.friendService.getFriendIds(user);
+
+        for (const id of friendsIds) {
+            const friendSocket = activeSockets.get(String(id));
+
+            if (friendSocket) {
+                friendSocket.emit('friend-geolocation', {
+                    friendId: user,
+                    position: position,
+                });
+            }
+        }
+
+        await this.mapService.saveGeolocation(user, position);
+    }
+
+    async setShake(userId: number) {
+        await this.redis.set(`shake:user:${userId}`, true, 1000);
+    }
+
+    async getGeo(userId: number) {
+        return await this.redis.getGeo(userId);
+    }
+
+    async getNearbyUsers(
+        geo: {
+            longitude: string;
+            latitude: string;
+        },
+        radius: number,
+    ) {
+        return await this.redis.getGeoSearch(geo, radius);
+    }
+
+    async handleShake(
+        userId: number,
+        client: Socket,
+        activeSockets: Map<string, any>,
+    ) {
+        await this.setShake(userId);
+
+        const userGeo = this.getGeo(userId);
+
+        if (!userGeo[0]) return;
+
+        const nearbyUsers = await this.getNearbyUsers(userGeo[0], 100);
+
+        const nearbyUsersIds = nearbyUsers
+            .map((nearbyUser) =>
+                Number(nearbyUser.split(':')[1]) !== Number(userId)
+                    ? Number(nearbyUser.split(':')[1])
+                    : null,
+            )
+            .filter((id) => id && id);
+
+        const friendsIds = await this.friendService.getFriendIds(userId);
+
+        friendsIds.map(async (id) => {
+            if (!nearbyUsersIds.includes(Number(id))) return;
+
+            const friendSocket = activeSockets.get(String(id));
+
+            if (friendSocket) {
+                const isShake = await this.redis.get(`shake:user:${id}`);
+
+                if (isShake) {
+                    const res = await this.mapService.shake(userId, id);
+                    if (!res) return;
+
+                    client.emit('shake', res);
+                }
+            }
+        });
+    }
+
+    async handleMessageRead(
+        dto: IMessagesReadDto[],
+        client: Socket,
+        activeSockets: Map<string, any>,
+    ) {
+        const groupedMessages = dto.reduce(
+            (acc, curr) => {
+                acc[curr.friend_id] = acc[curr.friend_id] || [];
+                acc[curr.friend_id].push(curr);
+                return acc;
+            },
+            {} as Record<
+                string,
+                { message_id: string; read_at: string; user_id: string }[]
+            >,
+        );
+
+        for (const [friend_id, messages] of Object.entries(groupedMessages)) {
+            const friendSocket = activeSockets.get(friend_id);
+
+            messages.forEach((message) => {
+                const messageWithFriendId = {
+                    ...message,
+                    friend_id: friend_id, // Явное указание friend_id
+                    user_id: message.user_id, // Извлечение user_id из сообщения
+                };
+
+                if (friendSocket) {
+                    friendSocket.emit('messages-read', messageWithFriendId);
+                } else {
+                    console.log(`Friend ${friend_id} is not connected`);
+                }
+            });
+        }
+
+        await this.messageService.updateMessageStatus(dto);
+    }
+
+    async handleUserListRefresh(
+        { chatId, userId }: { chatId: number; userId: number },
+        activeSockets: Map<string, any>,
+    ) {
+        const friendSocket = activeSockets.get(String(chatId));
+
+        if (friendSocket) {
+            friendSocket.emit('messages-user-list-invalidate', {
+                friendId: userId,
+            });
+        }
+    }
+
+    async handleMessageListRefresh(
+        { chatId, userId }: { chatId: number; userId: number },
+        activeSockets: Map<string, any>,
+    ) {
+        const friendSocket = activeSockets.get(String(chatId));
+
+        if (friendSocket) {
+            friendSocket.emit('messages-list-invalidate', {
+                friendId: userId,
+            });
+        }
+    }
+
+    async handleFriendsAcceptRequest(
+        { userId, friendId }: IFriendsRequestDto,
+        client: Socket,
+        activeSockets: Map<string, any>,
+    ) {
+        // обновляем бд
+        await this.friendService.acceptRequest(userId, friendId);
+
+        // Получаем сокет друга
+        const friendSocket = activeSockets.get(String(friendId));
+
+        const senderName = await this.userService.getUserWithSelect(
+            Number(userId),
+            { name: true },
+        );
+
+        if (friendSocket && senderName) {
+            // Уведомляем друга
+            friendSocket.emit('friends-request-accept-notification', {
+                message: `Ваш запрос принял ${userId}`,
+                requesterId: userId,
+                senderName: senderName.name,
+                acceptedAt: new Date(),
+                userId: userId,
+            });
+        }
+
+        // Подтверждаем действие инициатору
+        client.emit('friends-accept-request', { success: true });
+    }
+
+    async handleFriendsRequests(
+        { userId, friendId }: IFriendsRequestDto,
+        client: Socket,
+        activeSockets: Map<string, any>,
+    ) {
+        // записываем в бд
+        await this.friendService.addFriend(userId, friendId);
+
+        // Получаем сокет друга
+        const friendSocket = activeSockets.get(String(friendId));
+
+        const senderName = await this.userService.getUserWithSelect(
+            Number(userId),
+            { name: true },
+        );
+
+        if (friendSocket && senderName) {
+            // Уведомляем друга
+            friendSocket.emit('friends-request-notification', {
+                message: `Новый запрос в друзья от пользователя ${userId}`,
+                requesterId: userId,
+                senderName: senderName.name,
+                sendAt: new Date(),
+                userId: userId,
+            });
+        }
+
+        // Подтверждаем действие инициатору
+        client.emit('friends-request', { success: true });
+    }
+
+    async handleMessages(dto: IChatMessageDto, client: Socket, activeSockets: Map<string, any>) {
         const { userId, recipientId, content, fileUuids, replyMessageId } = dto;
 
         // Проверяем существование чата или создаем новый
@@ -118,7 +286,7 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('messages', { ...result, userId, recipientId });
 
         // Получаем сокет друга
-        const friendSocket = this.activeSockets.get(String(recipientId));
+        const friendSocket = activeSockets.get(String(recipientId));
 
         if (friendSocket && senderName) {
             // Уведомляем друга
@@ -128,253 +296,6 @@ export class SocketService implements OnGatewayConnection, OnGatewayDisconnect {
                 recipientId,
                 senderName: senderName.name,
             });
-        } else {
-            console.log(`Friend ${recipientId} is not connected`);
         }
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('friends-request')
-    async handleFriendsRequests(
-        @MessageBody() dto: IFriendsRequestDto,
-        @ConnectedSocket() client: any,
-    ) {
-        // записываем в бд
-        await this.friendService.addFriend(dto.userId, dto.friendId);
-
-        // Получаем сокет друга
-        const friendSocket = this.activeSockets.get(String(dto.friendId));
-
-        const senderName = await this.userService.getUserWithSelect(
-            Number(dto.userId),
-            { name: true },
-        );
-
-        if (friendSocket && senderName) {
-            // Уведомляем друга
-            friendSocket.emit('friends-request-notification', {
-                message: `Новый запрос в друзья от пользователя ${dto.userId}`,
-                requesterId: dto.userId,
-                senderName: senderName.name,
-                sendAt: new Date(),
-                userId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.friendId} is not connected`);
-        }
-
-        // Подтверждаем действие инициатору
-        client.emit('friends-request', { success: true });
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('friends-accept-requests')
-    async handleFriendsAcceptRequest(
-        @MessageBody() dto: IFriendsRequestDto,
-        @ConnectedSocket() client: any,
-    ) {
-        // обновляем бд
-        await this.friendService.acceptRequest(dto.userId, dto.friendId);
-
-        // Получаем сокет друга
-        const friendSocket = this.activeSockets.get(String(dto.friendId));
-
-        const senderName = await this.userService.getUserWithSelect(
-            Number(dto.userId),
-            { name: true },
-        );
-
-        if (friendSocket && senderName) {
-            // Уведомляем друга
-            friendSocket.emit('friends-request-accept-notification', {
-                message: `Ваш запрос принял ${dto.userId}`,
-                requesterId: dto.userId,
-                senderName: senderName.name,
-                acceptedAt: new Date(),
-                userId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.friendId} is not connected`);
-        }
-
-        // Подтверждаем действие инициатору
-        client.emit('friends-accept-request', { success: true });
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('friends-cancel-outgoing-request')
-    async handleFriendsCancelRequest(
-        @MessageBody() dto: IFriendsRequestDto,
-        @ConnectedSocket() client: any,
-    ) {
-        // обновляем бд
-        await this.friendService.cancelOutgoingRequest(
-            dto.userId,
-            dto.friendId,
-        );
-
-        // Подтверждаем действие инициатору
-        client.emit('friends-cancel-outgoing-request', { success: true });
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('online-users')
-    async handleOnlineUser(
-        @MessageBody() dto: number[],
-        @ConnectedSocket() client: any,
-    ) {
-        const onlineUser = Array();
-
-        dto.forEach((id) => {
-            const userSocket = this.activeSockets.get(String(id));
-
-            if (userSocket) {
-                onlineUser.push(id);
-            }
-        });
-
-        console.log('Online users: ' + onlineUser);
-
-        client.emit('online-users', onlineUser);
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('messages-list-invalidate')
-    async handleMessageListRefresh(
-        @MessageBody() dto: { userId: string; chatId: string },
-    ) {
-        const friendSocket = this.activeSockets.get(String(dto.chatId));
-
-        if (friendSocket) {
-            friendSocket.emit('messages-list-invalidate', {
-                friendId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.chatId} is not connected`);
-        }
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('messages-user-list-invalidate')
-    async handleUserListRefresh(
-        @MessageBody() dto: { userId: string; chatId: string },
-    ) {
-        const friendSocket = this.activeSockets.get(String(dto.chatId));
-
-        if (friendSocket) {
-            friendSocket.emit('messages-user-list-invalidate', {
-                friendId: dto.userId,
-            });
-        } else {
-            console.log(`Friend ${dto.chatId} is not connected`);
-        }
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('messages-read')
-    async handleMessageRead(
-        @MessageBody()
-        dto: {
-            message_id: string;
-            chat_id: string;
-            user_id: string;
-            friend_id: string;
-            read_at: string;
-        }[],
-        @ConnectedSocket() client: Socket,
-    ) {
-        const groupedMessages = dto.reduce(
-            (acc, curr) => {
-                acc[curr.friend_id] = acc[curr.friend_id] || [];
-                acc[curr.friend_id].push(curr);
-                return acc;
-            },
-            {} as Record<
-                string,
-                { message_id: string; read_at: string; user_id: string }[]
-            >,
-        );
-
-        for (const [friend_id, messages] of Object.entries(groupedMessages)) {
-            const friendSocket = this.activeSockets.get(friend_id);
-
-            messages.forEach((message) => {
-                const messageWithFriendId = {
-                    ...message,
-                    friend_id: friend_id, // Явное указание friend_id
-                    user_id: message.user_id, // Извлечение user_id из сообщения
-                };
-
-                if (friendSocket) {
-                    friendSocket.emit('messages-read', messageWithFriendId);
-                } else {
-                    console.log(`Friend ${friend_id} is not connected`);
-                }
-            });
-        }
-
-        await this.messageService.updateMessageStatus(dto);
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('save-geolocation')
-    async saveGeolocation(
-        @MessageBody() dto: [number, number],
-        @ConnectedSocket() client: Socket,
-        @SocketUser() user: number,
-    ) {
-        const friendsIds = await this.friendService.getFriendIds(user);
-
-        friendsIds.map((id) => {
-            const friendSocket = this.activeSockets.get(String(id));
-
-            if (friendSocket) {
-                friendSocket.emit('friend-geolocation', {
-                    friendId: user,
-                    position: dto,
-                });
-            }
-        });
-
-        await this.mapService.saveGeolocation(user, dto);
-    }
-
-    @UseGuards(SocketAuthenticatedGuard)
-    @SubscribeMessage('shake')
-    async saveShake(
-        @ConnectedSocket() client: Socket,
-        @SocketUser() user: number,
-    ) {
-        await this.redis.set(`shake:user:${user}`, true, 1000);
-
-        const userGeo = await this.redis.getGeo(user);
-
-        if (!userGeo[0]) return;
-
-        const nearbyUsers = await this.redis.getGeoSearch(userGeo[0], 100);
-        const nearbyUsersIds = nearbyUsers.map(
-            (nearbyUser) =>
-                Number(nearbyUser.split(':')[1]) !== Number(user) ?
-                Number(nearbyUser.split(':')[1]) : null
-        ).filter(id => id && id);
-
-        const friendsIds = await this.friendService.getFriendIds(user);
-
-        friendsIds.map(async (id) => {
-            if(!nearbyUsersIds.includes(Number(id))) return
-
-            const friendSocket = this.activeSockets.get(String(id));
-
-            if (friendSocket) {
-                const isShake = await this.redis.get(`shake:user:${id}`);
-
-                if(isShake) {
-                    const res = await this.mapService.shake(user, id)
-                    if(!res) return
-
-                    client.emit("shake", res)
-                }
-            }
-        });
     }
 }

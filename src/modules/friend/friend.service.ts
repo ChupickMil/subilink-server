@@ -105,14 +105,15 @@ export class FriendService {
         ).then((users) => users.filter((user) => user !== null));
     }
 
-    async addFriend(userId: string, friendId: string) {
+    async addFriend(userId: number, friendId: number) {
         const isExist = await this.prisma.friend.findFirst({
             where: {
                 follower_id: Number(userId),
                 followed_id: Number(friendId),
             },
         });
-        if (isExist) return;
+
+        if (isExist) return false;
 
         await this.prisma.friend.create({
             data: {
@@ -120,11 +121,13 @@ export class FriendService {
                 followed_id: Number(friendId),
             },
         });
+
+        return true
     }
 
-    async acceptRequest(userId: string, friendId: string) {
+    async acceptRequest(userId: number, friendId: number) {
         try {
-            const res = await this.prisma.friend.updateMany({
+            await this.prisma.friend.updateMany({
                 where: {
                     follower_id: Number(friendId),
                     followed_id: Number(userId),
@@ -134,12 +137,13 @@ export class FriendService {
                     status: FriendStatuses.confirmed,
                 },
             });
+            return true
         } catch (err) {
             throw new Error(err);
         }
     }
 
-    async cancelOutgoingRequest(userId: string, friendId: string) {
+    async cancelOutgoingRequest(userId: number, friendId: number) {
         try {
             await this.prisma.friend.deleteMany({
                 where: {

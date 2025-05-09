@@ -6,6 +6,7 @@ import { MapModule } from '../map/map.module'
 import { MessageModule } from '../message/message.module'
 import { RedisModule } from '../redis/redis.module'
 import { UserModule } from '../user/user.module'
+import { SocketGateway } from './socket.controller'
 import { SocketService } from './socket.service'
 
 @Module({
@@ -18,7 +19,7 @@ import { SocketService } from './socket.service'
         MessageModule,
         ChatModule,
     ],
-    providers: [SocketService],
+    providers: [SocketService, SocketGateway],
     exports: [SocketService],
 })
 export class SocketModule {}
