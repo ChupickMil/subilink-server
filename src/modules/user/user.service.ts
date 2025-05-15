@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
+import { randomUUID } from "crypto"
+import * as fs from 'fs/promises'
+import * as path from 'path'
 import { PrismaService } from 'src/modules/prisma/prisma.service'
 import { RedisService } from 'src/modules/redis/redis.service'
 import { FileService } from '../file/file.service'
@@ -25,10 +28,50 @@ export class UserService {
                 },
             });
 
+            await this.setDefaultAvatar(newUser.id);
+            
             return newUser;
         } catch (err) {
             throw new Error(err);
         }
+    }
+
+    async setDefaultAvatar(userId: number) {
+        const sourcePath = path.join(
+            process.cwd(),
+            'uploads',
+            '0',
+            'fd89eff8-eef0-4d71-b929-4999ae0a8fe2.png',
+        );
+
+        const uuid = randomUUID();
+        const destinationDir = path.join(
+            process.cwd(),
+            'uploads',
+            String(userId),
+        );
+        const destinationPath = path.join(destinationDir, `${uuid}.png`);
+
+        try {
+            const avatarBuffer = await fs.readFile(sourcePath);
+
+            const avatarForDb = {
+                uuid: uuid,
+                path: destinationPath,
+                type: 'image/png',
+                size: avatarBuffer.length,
+                mime_type: 'image/png',
+                original_name: `default.png`,
+                user_id: userId,
+            };
+
+            await this.saveAvatar(avatarForDb);
+
+            await fs.mkdir(destinationDir, { recursive: true });
+            await fs.writeFile(destinationPath, avatarBuffer);
+            
+            await this.updateAvatarByUuid(userId, uuid)
+        } catch {}
     }
 
     public async findUserSelect<T extends Prisma.UserSelect>(
@@ -114,7 +157,7 @@ export class UserService {
         return user?.name;
     }
 
-    async updateAvatarByUuid(userId: string, uuid: string) {
+    async updateAvatarByUuid(userId: Number, uuid: string) {
         await this.prisma.user.update({
             where: {
                 id: Number(userId),

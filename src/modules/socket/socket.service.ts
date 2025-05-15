@@ -20,10 +20,20 @@ export class SocketService {
     ) {}
 
     async getOnlineUsers(userIds: number[], activeSockets: Map<string, any>) {
-        return userIds.map((id: number) => {
-            return activeSockets.get(String(id));
+    try {
+        const onlineUsers = userIds.map((id: number) => {
+            const user = activeSockets.get(String(id));
+            
+            if(user) {
+                return id
+            }
         });
+
+        return onlineUsers.filter((user) => user !== null);
+    } catch (error) {
+        throw new Error("Failed to get online users");
     }
+}
 
     async cancelOutgoingRequest(userId: number, friendId: number) {
         await this.friendService.cancelOutgoingRequest(userId, friendId);
@@ -48,6 +58,16 @@ export class SocketService {
         }
 
         await this.mapService.saveGeolocation(user, position);
+    }
+
+    async updateTimeWithFriends(user: number) {
+        const pos = await this.redis.getGeo(user)
+
+        if(!pos[0]) return
+
+        const nearbyUsers = await this.getNearbyUsers(pos[0], 100);
+
+        
     }
 
     async setShake(userId: number) {
@@ -75,7 +95,7 @@ export class SocketService {
     ) {
         await this.setShake(userId);
 
-        const userGeo = this.getGeo(userId);
+        const userGeo = await this.getGeo(userId);
 
         if (!userGeo[0]) return;
 
@@ -235,7 +255,11 @@ export class SocketService {
         client.emit('friends-request', { success: true });
     }
 
-    async handleMessages(dto: IChatMessageDto, client: Socket, activeSockets: Map<string, any>) {
+    async handleMessages(
+        dto: IChatMessageDto,
+        client: Socket,
+        activeSockets: Map<string, any>,
+    ) {
         const { userId, recipientId, content, fileUuids, replyMessageId } = dto;
 
         // Проверяем существование чата или создаем новый

@@ -11,14 +11,12 @@ import { AppModule } from './modules/app/app.module'
 import { RedisService } from './modules/redis/redis.service'
 
 async function bootstrap() {
-    //
     const httpsOptions = {
         // key: readFileSync('C:\\Windows\\System32\\localhost-key.pem'),
 	    // cert: readFileSync('C:\\Windows\\System32\\localhost.pem'),
         key: readFileSync('C:\\Windows\\System32\\192.168.31.179-key.pem'),
 	    cert: readFileSync('C:\\Windows\\System32\\192.168.31.179.pem'),
     };
-    //
 
     const app = await NestFactory.create(AppModule, { httpsOptions });
 
@@ -60,6 +58,8 @@ async function bootstrap() {
         origin: [
             'http://localhost:3000',
             'https://localhost:3000',
+            'http://172.28.0.5:3000',
+            'http://client:3000',
             'http://192.168.31.60:3000',
             'https://192.168.31.60:3000',
             'http://192.168.31.179:3000',

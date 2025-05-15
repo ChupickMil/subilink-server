@@ -15,18 +15,20 @@ import { IChatMessageDto, IFriendsRequestDto, IMessagesReadDto } from './types'
 
 @WebSocketGateway({
     cors: {
-        origin: ['http://localhost:3000',
+        origin: [
+            'http://localhost:3000',
+            'http://client:3000',
+            'http://172.28.0.5:3000',
             'https://localhost:3000',
             'http://192.168.31.60:3000',
             'https://192.168.31.60:3000',
             'http://192.168.31.179:3000',
-            'https://192.168.31.179:3000'], // точный домен
+            'https://192.168.31.179:3000',
+        ], // точный домен
     },
 })
 export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
-    constructor(
-        private readonly socketService: SocketService
-    ) {}
+    constructor(private readonly socketService: SocketService) {}
 
     private activeSockets = new Map<string, any>(); // Хранилище сокетов (userId -> сокет)
 
@@ -57,7 +59,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IChatMessageDto,
         @ConnectedSocket() client: Socket,
     ) {
-        return await this.socketService.handleMessages(dto, client, this.activeSockets)
+        return await this.socketService.handleMessages(
+            dto,
+            client,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -66,7 +72,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: any,
     ) {
-        return await this.socketService.handleFriendsRequests(dto, client, this.activeSockets)
+        return await this.socketService.handleFriendsRequests(
+            dto,
+            client,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -75,7 +85,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: Socket,
     ) {
-        return await this.socketService.handleFriendsAcceptRequest(dto, client, this.activeSockets)
+        return await this.socketService.handleFriendsAcceptRequest(
+            dto,
+            client,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -84,9 +98,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: IFriendsRequestDto,
         @ConnectedSocket() client: Socket,
     ) {
-        const { userId, friendId } = dto
+        const { userId, friendId } = dto;
 
-        await this.socketService.cancelOutgoingRequest(userId, friendId)
+        await this.socketService.cancelOutgoingRequest(userId, friendId);
 
         client.emit('friends-cancel-outgoing-request', { success: true });
     }
@@ -97,7 +111,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: number[],
         @ConnectedSocket() client: Socket,
     ) {
-        const onlineUser = await this.socketService.getOnlineUsers(dto, this.activeSockets)
+        const onlineUser = await this.socketService.getOnlineUsers(
+            dto,
+            this.activeSockets,
+        );
 
         client.emit('online-users', onlineUser);
     }
@@ -107,7 +124,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     async handleMessageListRefresh(
         @MessageBody() dto: { userId: number; chatId: number },
     ) {
-       return await this.socketService.handleMessageListRefresh(dto, this.activeSockets)
+        return await this.socketService.handleMessageListRefresh(
+            dto,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -115,7 +135,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     async handleUserListRefresh(
         @MessageBody() dto: { userId: number; chatId: number },
     ) {
-        return await this.socketService.handleUserListRefresh(dto, this.activeSockets)
+        return await this.socketService.handleUserListRefresh(
+            dto,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -125,7 +148,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         dto: IMessagesReadDto[],
         @ConnectedSocket() client: Socket,
     ) {
-        return await this.socketService.handleMessageRead(dto, client, this.activeSockets)
+        return await this.socketService.handleMessageRead(
+            dto,
+            client,
+            this.activeSockets,
+        );
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -134,7 +161,13 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() dto: [number, number],
         @SocketUser() user: number,
     ) {
-        return await this.socketService.saveGeolocation(user, dto, this.activeSockets)
+        await this.socketService.saveGeolocation(
+            user,
+            dto,
+            this.activeSockets,
+        );
+
+        await this.socketService.updateTimeWithFriends(user)
     }
 
     @UseGuards(SocketAuthenticatedGuard)
@@ -143,6 +176,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
         @SocketUser() user: number,
     ) {
-        return await this.socketService.handleShake(user, client, this.activeSockets)
+        return await this.socketService.handleShake(
+            user,
+            client,
+            this.activeSockets,
+        );
     }
 }
