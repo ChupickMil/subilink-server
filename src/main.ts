@@ -18,7 +18,9 @@ async function bootstrap() {
 	    cert: readFileSync('C:\\Windows\\System32\\192.168.31.179.pem'),
     };
 
-    const app = await NestFactory.create(AppModule, { httpsOptions });
+    const app = await NestFactory.create(AppModule
+        , { httpsOptions }
+    );
 
     const config = new DocumentBuilder()
         .setDescription('Description API')

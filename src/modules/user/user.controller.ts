@@ -211,14 +211,18 @@ export class UserController {
             return res.status(HttpStatus.NOT_FOUND).send('Image not found');
         }
 
-        res.setHeader('Content-Type', data.mime_type);
-        res.setHeader('Cache-Control', 'public, max-age=10800');
-        res.setHeader(
-            'Content-Disposition',
-            `inline; filename="${encodeURIComponent(data.original_name)}"`,
-        );
-
-        fs.createReadStream(data.path).pipe(res);
+        try {
+            res.setHeader('Content-Type', data.mime_type);
+            res.setHeader('Cache-Control', 'public, max-age=10800');
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${encodeURIComponent(data.original_name)}"`,
+            );
+    
+            fs.createReadStream(data.path).pipe(res);
+        } catch(err) {
+            console.log(err)
+        }
     }
 
     @ApiResponse({ status: 201 })

@@ -6,6 +6,8 @@ export class SocketIoAdapter extends IoAdapter {
     options.cors = {
       origin: ['http://localhost:3000',
             'http://client:3000',
+            'https://sabilink.ru:3000',
+            'https://sabilink.ru',
             'https://localhost:3000',
             'http://172.28.0.5:3000',
             'http://192.168.31.60:3000',

@@ -17,6 +17,8 @@ import { IChatMessageDto, IFriendsRequestDto, IMessagesReadDto } from './types'
     cors: {
         origin: [
             'http://localhost:3000',
+            'https://sabilink.ru:3000',
+            'https://sabilink.ru',
             'http://client:3000',
             'http://172.28.0.5:3000',
             'https://localhost:3000',

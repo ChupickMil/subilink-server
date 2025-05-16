@@ -10,8 +10,4 @@ export class UpdateNameDto {
     @ApiProperty()
     @IsString()
     name: string;
-
-    @ApiProperty()
-    @IsString()
-    phone: string;
 }
