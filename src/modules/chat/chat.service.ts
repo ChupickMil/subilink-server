@@ -133,8 +133,9 @@ export class ChatService {
                         const [message, first_user, second_user] =
                             await Promise.all([
                                 await this.messageService.getMessageForChats([
-                                    chatId,
-                                ]),
+                                    chat.first_user,
+                                    chat.second_user
+                                ], chatId),
 
                                 await this.userService.getUserWithSelect(
                                     chat.first_user,

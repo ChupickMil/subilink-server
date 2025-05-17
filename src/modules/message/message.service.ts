@@ -107,9 +107,10 @@ export class MessageService {
         };
     }
 
-    public async getMessageForChats(userIds: string[] | number[]) {
+    public async getMessageForChats(userIds: string[] | number[], chatId: number) {
         return await this.prisma.message.findMany({
             where: {
+                chat_id: Number(chatId),
                 OR: [
                     { delete_for: { equals: null } },
                     {

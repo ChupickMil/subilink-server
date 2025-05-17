@@ -4,22 +4,21 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import RedisStore from 'connect-redis'
 import * as cookieParser from 'cookie-parser'
 import * as session from 'express-session'
-import { readFileSync } from 'fs'
 import * as passport from 'passport'
 import { SocketIoAdapter } from './adapter/SocketAdapter'
 import { AppModule } from './modules/app/app.module'
 import { RedisService } from './modules/redis/redis.service'
 
 async function bootstrap() {
-    const httpsOptions = {
-        // key: readFileSync('C:\\Windows\\System32\\localhost-key.pem'),
-	    // cert: readFileSync('C:\\Windows\\System32\\localhost.pem'),
-        key: readFileSync('C:\\Windows\\System32\\192.168.31.179-key.pem'),
-	    cert: readFileSync('C:\\Windows\\System32\\192.168.31.179.pem'),
-    };
+    // const httpsOptions = {
+    //     // key: readFileSync('C:\\Windows\\System32\\localhost-key.pem'),
+	//     // cert: readFileSync('C:\\Windows\\System32\\localhost.pem'),
+    //     key: readFileSync('C:\\Windows\\System32\\192.168.31.179-key.pem'),
+	//     cert: readFileSync('C:\\Windows\\System32\\192.168.31.179.pem'),
+    // };
 
     const app = await NestFactory.create(AppModule
-        , { httpsOptions }
+        // , { httpsOptions }
     );
 
     const config = new DocumentBuilder()
